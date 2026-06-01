@@ -209,7 +209,3 @@ RegisterVector3<MyComponent>("myVector", "My Vector",
 The property picker and timeline editor pick up the new entry automatically.
 
 ---
-
-## License
-
-MIT — see [LICENSE](LICENSE.md).
