@@ -1,0 +1,20 @@
+{
+    "name": "TweenAnimator.Runtime",
+    "rootNamespace": "TweenAnimator",
+    "references": [
+        "DOTween.Modules",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "DOTween.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

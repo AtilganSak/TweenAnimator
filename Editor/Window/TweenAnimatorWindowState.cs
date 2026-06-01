@@ -1,0 +1,296 @@
+using System.Collections.Generic;
+using DG.Tweening;
+using UnityEditor;
+using UnityEngine;
+
+namespace TweenAnimator.Editor
+{
+    public enum WindowMode { NoSelection, NoComponent, NoClip, HasController }
+
+    public class TweenAnimatorWindowState
+    {
+        public WindowMode              Mode             { get; private set; } = WindowMode.NoSelection;
+        public TweenAnimatorController Controller       { get; private set; }
+        public TweenEntryData          SelectedEntry    { get; set; }
+        public float                   CurrentTime      { get; private set; }
+        public bool                    IsPreviewPlaying { get; private set; }
+
+        private Dictionary<string, PropertyValueUnion> _snapshot;
+        private Dictionary<string, PropertyValueUnion> _useCurrentStartCache = new Dictionary<string, PropertyValueUnion>();
+        private bool                                    _snapshotTaken;
+        private double                                  _lastEditorTime;
+
+        // ─── Preview mode ─────────────────────────────────────────────────────
+
+        public bool IsPreviewEnabled { get; private set; }
+
+        public void EnterPreviewMode()
+        {
+            if (IsPreviewEnabled || Controller == null) return;
+            IsPreviewEnabled = true;
+            _useCurrentStartCache.Clear();
+            EnsureSnapshot();
+            GotoTime(0f);
+        }
+
+        public void ExitPreviewMode()
+        {
+            if (!IsPreviewEnabled) return;
+            if (IsPreviewPlaying) { EditorApplication.update -= OnEditorUpdate; IsPreviewPlaying = false; }
+            CurrentTime      = 0f;
+            _lastAppliedTime = -1f;
+            _useCurrentStartCache.Clear();
+            RestoreSnapshot();
+            IsPreviewEnabled = false;
+            EditorApplication.QueuePlayerLoopUpdate();
+            SceneView.RepaintAll();
+        }
+
+        // ─── Selection ────────────────────────────────────────────────────────
+
+        public void Evaluate()
+        {
+            var go = Selection.activeGameObject;
+            if (go == null)                                        { Set(WindowMode.NoSelection, null); return; }
+            var ctrl = go.GetComponentInParent<TweenAnimatorController>();
+            if (ctrl == null)                                      { Set(WindowMode.NoComponent, null); return; }
+            if (ctrl.Clip == null)                                 { Set(WindowMode.NoClip, ctrl);      return; }
+            Set(WindowMode.HasController, ctrl);
+        }
+
+        private void Set(WindowMode mode, TweenAnimatorController ctrl)
+        {
+            if (mode != WindowMode.HasController) ExitPreviewMode();
+            Mode       = mode;
+            Controller = ctrl;
+            if (SelectedEntry != null && (Controller?.Sequence == null || !Controller.Sequence.entries.Contains(SelectedEntry)))
+                SelectedEntry = null;
+        }
+
+        // ─── Scrubbing (manual interpolation — no DOTween sequence needed) ───
+
+        public void GotoTime(float time)
+        {
+            if (!IsPreviewEnabled || Controller == null || Controller.Sequence == null) return;
+            EnsureSnapshot();
+
+            float total = Mathf.Max(0.001f, Controller.Sequence.TotalDuration);
+            CurrentTime = Mathf.Clamp(time, 0f, total);
+            ApplyAtTime(CurrentTime);
+            EditorApplication.QueuePlayerLoopUpdate();
+            SceneView.RepaintAll();
+        }
+
+        // Directly interpolate and apply all entry values at the given time.
+        // Bypasses DOTween so it works reliably in Edit Mode without an active sequence.
+        private float _lastAppliedTime = -1f;
+
+        private void ApplyAtTime(float time)
+        {
+            if (Controller == null || Controller.Sequence == null) return;
+
+            bool scrubbingBackward = time < _lastAppliedTime;
+            if (scrubbingBackward)
+                _useCurrentStartCache.Clear();
+            _lastAppliedTime = time;
+
+            foreach (var entry in Controller.Sequence.entries)
+            {
+                if (!entry.isEnabled || entry.binding == null) continue;
+
+                var accessor  = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var component = ResolveComponent(Controller, entry.binding);
+                if (accessor == null || component == null) continue;
+
+                float localT;
+                if (time < entry.delay)
+                {
+                    // Entry not started yet — apply start value so the object sits at its pre-tween state.
+                    _useCurrentStartCache.Remove(entry.entryId);
+                    if (!entry.useCurrentAsStart)
+                    {
+                        PropertyValueUnion preStart;
+                        if (!string.IsNullOrEmpty(entry.linkedStartEntryId))
+                        {
+                            var linked = Controller.Sequence.entries.Find(e => e.entryId == entry.linkedStartEntryId);
+                            preStart = linked != null ? linked.endValue : entry.startValue;
+                        }
+                        else
+                            preStart = entry.startValue;
+                        accessor.ApplyValue(component, preStart);
+                    }
+                    continue;
+                }
+                else if (entry.EffectiveDuration <= 0f || time >= entry.delay + entry.EffectiveDuration)
+                {
+                    localT = 1f;
+                }
+                else
+                {
+                    localT = (time - entry.delay) / entry.EffectiveDuration;
+                }
+
+                float easedT = DOVirtual.EasedValue(0f, 1f, localT, entry.ease);
+
+                PropertyValueUnion from;
+                if (entry.useCurrentAsStart)
+                {
+                    // Capture from-value once when entry first becomes active.
+                    // Subsequent frames reuse the cache to prevent exponential convergence.
+                    if (!_useCurrentStartCache.TryGetValue(entry.entryId, out from))
+                    {
+                        from = accessor.ReadValue(component);
+                        _useCurrentStartCache[entry.entryId] = from;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(entry.linkedStartEntryId))
+                {
+                    var linked = Controller.Sequence.entries.Find(e => e.entryId == entry.linkedStartEntryId);
+                    from = linked != null ? linked.endValue : entry.startValue;
+                }
+                else
+                    from = entry.startValue;
+
+                accessor.ApplyValue(component, LerpValue(from, entry.endValue, easedT));
+            }
+        }
+
+        private static PropertyValueUnion LerpValue(PropertyValueUnion a, PropertyValueUnion b, float t)
+        {
+            var r = new PropertyValueUnion { type = a.type };
+            switch (a.type)
+            {
+                case PropertyType.Float:   r.floatValue   = Mathf.Lerp(a.floatValue, b.floatValue, t);          break;
+                case PropertyType.Vector2: r.vector2Value = Vector2.Lerp(a.vector2Value, b.vector2Value, t);     break;
+                case PropertyType.Vector3: r.vector3Value = Vector3.Lerp(a.vector3Value, b.vector3Value, t);     break;
+                case PropertyType.Color:   r.colorValue   = Color.Lerp(a.colorValue, b.colorValue, t);           break;
+            }
+            return r;
+        }
+
+        // ─── Playback (DOTween sequence) ──────────────────────────────────────
+
+        public void StartPreview()
+        {
+            if (Controller == null) return;
+            EnsureSnapshot();
+            _lastEditorTime = EditorApplication.timeSinceStartup;
+            if (!IsPreviewPlaying)
+            {
+                EditorApplication.update += OnEditorUpdate;
+                IsPreviewPlaying = true;
+            }
+        }
+
+        public void PausePreview()
+        {
+            if (!IsPreviewPlaying) return;
+            EditorApplication.update -= OnEditorUpdate;
+            IsPreviewPlaying = false;
+        }
+
+        public void StopPreview()
+        {
+            if (!IsPreviewEnabled) return;
+            if (IsPreviewPlaying)
+            {
+                EditorApplication.update -= OnEditorUpdate;
+                IsPreviewPlaying = false;
+            }
+            GotoTime(0f);
+        }
+
+        public void RewindPreview()
+        {
+            bool wasPlaying = IsPreviewPlaying;
+            PausePreview();
+            GotoTime(0f);
+            if (wasPlaying) StartPreview();
+        }
+
+        private void OnEditorUpdate()
+        {
+            if (Controller == null || Controller.Sequence == null)
+            {
+                IsPreviewPlaying = false;
+                EditorApplication.update -= OnEditorUpdate;
+                return;
+            }
+
+            double now  = EditorApplication.timeSinceStartup;
+            float delta = (float)(now - _lastEditorTime);
+            _lastEditorTime = now;
+
+            float total   = Mathf.Max(0.001f, Controller.Sequence.TotalDuration);
+            float newTime = (CurrentTime + delta * Controller.Sequence.timeScale) % total;
+            GotoTime(newTime);
+        }
+
+        // ─── Snapshot ─────────────────────────────────────────────────────────
+
+        private void EnsureSnapshot()
+        {
+            if (_snapshotTaken) return;
+            TakeSnapshot();
+            _snapshotTaken = true;
+        }
+
+        private void TakeSnapshot()
+        {
+            _snapshot = new Dictionary<string, PropertyValueUnion>();
+            if (Controller == null || Controller.Sequence == null) return;
+
+            foreach (var entry in Controller.Sequence.entries)
+            {
+                if (!entry.isEnabled || entry.binding == null) continue;
+                string key = SnapshotKey(entry);
+                if (_snapshot.ContainsKey(key)) continue;
+
+                var accessor  = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var component = ResolveComponent(Controller, entry.binding);
+                if (accessor != null && component != null)
+                    _snapshot[key] = accessor.ReadValue(component);
+            }
+        }
+
+        private void RestoreSnapshot()
+        {
+            if (_snapshot == null || Controller == null || Controller.Sequence == null) return;
+
+            foreach (var entry in Controller.Sequence.entries)
+            {
+                if (!entry.isEnabled || entry.binding == null) continue;
+                string key = SnapshotKey(entry);
+                if (!_snapshot.TryGetValue(key, out var saved)) continue;
+
+                var accessor  = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var component = ResolveComponent(Controller, entry.binding);
+                if (accessor != null && component != null)
+                    accessor.ApplyValue(component, saved);
+            }
+
+            _snapshot      = null;
+            _snapshotTaken = false;
+        }
+
+        private static string SnapshotKey(TweenEntryData e) =>
+            $"{e.binding.hierarchyPath}|{e.binding.componentTypeName}|{e.binding.propertyName}";
+
+        internal static UnityEngine.Component ResolveComponent(TweenAnimatorController ctrl, TweenPropertyBinding binding)
+        {
+            Transform t = string.IsNullOrEmpty(binding.hierarchyPath)
+                ? ctrl.transform
+                : ctrl.transform.Find(binding.hierarchyPath);
+            if (t == null) return null;
+
+            var type = System.Type.GetType(binding.componentTypeName);
+            if (type == null)
+                foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    type = asm.GetType(binding.componentTypeName);
+                    if (type != null) break;
+                }
+            return type != null ? t.GetComponent(type) : null;
+        }
+    }
+}
