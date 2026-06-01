@@ -37,7 +37,7 @@ A visual timeline-based tween animation editor for Unity, powered by **DOTween**
 2. Click the **+** button → **Add package from git URL…**
 3. Enter:
    ```
-   https://github.com/sakiraatilgan/TweenAnimator.git?path=Assets/TweenAnimator
+   https://github.com/AtilganSak/TweenAnimator.git
    ```
 
 ### Option B — Manual
