@@ -149,7 +149,7 @@ namespace TweenAnimator.Editor
                 return;
             }
 
-            // Delete key removes selected entry
+            // Keyboard shortcuts for selected entry
             if (_state.SelectedEntry != null && _state.Controller?.Clip != null)
             {
                 Event e = Event.current;
@@ -161,6 +161,11 @@ namespace TweenAnimator.Editor
                     EditorUtility.SetDirty(_state.Controller.Clip);
                     e.Use();
                     Repaint();
+                }
+                else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.D && e.control)
+                {
+                    DuplicateEntry(_state.Controller, _state.Controller.Sequence, _state.SelectedEntry);
+                    e.Use();
                 }
             }
 
@@ -687,11 +692,14 @@ namespace TweenAnimator.Editor
 
             Event e = Event.current;
 
-            // Right-click → delete context menu
+            // Right-click → context menu
             if (e.type == EventType.ContextClick && blockRect.Contains(e.mousePosition))
             {
                 var menu = new GenericMenu();
                 var cap = entry;
+                menu.AddItem(new GUIContent("Duplicate"), false, () =>
+                    DuplicateEntry(ctrl, seq, cap));
+                menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Delete"), false, () =>
                 {
                     Undo.RecordObject(ctrl.Clip, "Remove Tween Entry");
@@ -1201,6 +1209,45 @@ namespace TweenAnimator.Editor
         }
 
         // ─── Actions ───────────────────────────────────────────────────────────
+        private void DuplicateEntry(TweenAnimatorController ctrl, TweenSequenceData seq, TweenEntryData source)
+        {
+            Undo.RecordObject(ctrl.Clip, "Duplicate Tween Entry");
+
+            var copy = new TweenEntryData
+            {
+                entryId = System.Guid.NewGuid().ToString(),
+                trackId = source.trackId,
+                displayName = source.displayName,
+                trackColor = source.trackColor,
+                binding = source.binding == null
+                    ? null
+                    : new TweenPropertyBinding
+                    {
+                        hierarchyPath = source.binding.hierarchyPath,
+                        componentTypeName = source.binding.componentTypeName,
+                        propertyName = source.binding.propertyName,
+                        axis = source.binding.axis,
+                    },
+                startValue = source.startValue,
+                endValue = source.endValue,
+                useCurrentAsStart = source.useCurrentAsStart,
+                linkedStartEntryId = source.linkedStartEntryId,
+                delay = source.EndTime,
+                duration = source.duration,
+                speed = source.speed,
+                ease = source.ease,
+                loopType = source.loopType,
+                loops = source.loops,
+                rotateMode = source.rotateMode,
+                isEnabled = source.isEnabled,
+            };
+
+            seq.entries.Add(copy);
+            _state.SelectedEntry = copy;
+            EditorUtility.SetDirty(ctrl.Clip);
+            Repaint();
+        }
+
         private void AddEntry(TweenAnimatorController ctrl, TweenSequenceData seq, TweenPropertyBinding binding)
         {
             Undo.RecordObject(ctrl.Clip, "Add Tween Entry");
