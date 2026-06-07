@@ -73,6 +73,16 @@ namespace TweenAnimator
                 }
             }
 
+            if (data.markers != null)
+            {
+                foreach (var marker in data.markers)
+                {
+                    if (!marker.isEnabled || marker.time < 0f) continue;
+                    var capturedMarker = marker;
+                    seq.InsertCallback(marker.time, () => capturedMarker.InvokeTrigger());
+                }
+            }
+
             // DOTween requires at least one tween or callback for the sequence to have duration.
             // If the sequence is empty, append a zero-duration placeholder.
             if (data.entries.Count == 0)

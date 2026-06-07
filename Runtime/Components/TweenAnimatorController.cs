@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [assembly: InternalsVisibleTo("TweenAnimator.Editor")]
+
 namespace TweenAnimator
 {
     [Serializable] public class TweenLoopUnityEvent : UnityEvent<int>
@@ -36,6 +37,7 @@ namespace TweenAnimator
         private Sequence _builtSequence;
         private bool _isComplete;
         private Dictionary<string, TweenEntryData> _entryCache;
+        private Dictionary<string, EventMarkerData> _markerCache;
 
         // ── Clip ─────────────────────────────────────────────────────────────
         public TweenAnimatorClip Clip => clip;
@@ -116,6 +118,66 @@ namespace TweenAnimator
         private void EnsureEntryCache()
         {
             if (_entryCache == null) RebuildEntryCache();
+        }
+
+        // ── Marker lookup ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Find a marker by display name or markerId. Returns null if not found.
+        /// Example: ctrl.GetMarker("OnJump").OnTrigger += HandleJump;
+        /// </summary>
+        public EventMarkerData GetMarker(string nameOrId)
+        {
+            EnsureMarkerCache();
+            return _markerCache.TryGetValue(nameOrId, out var m) ? m : null;
+        }
+
+        private void RebuildMarkerCache()
+        {
+            _markerCache = new Dictionary<string, EventMarkerData>();
+            if (Sequence?.markers == null) return;
+            foreach (var marker in Sequence.markers)
+            {
+                if (!string.IsNullOrEmpty(marker.displayName) && !_markerCache.ContainsKey(marker.displayName))
+                    _markerCache[marker.displayName] = marker;
+                if (!_markerCache.ContainsKey(marker.markerId))
+                    _markerCache[marker.markerId] = marker;
+            }
+        }
+
+        private void EnsureMarkerCache()
+        {
+            if (_markerCache == null) RebuildMarkerCache();
+        }
+
+        /// <summary>
+        /// Add a marker at runtime. Call Play() after to include it in the running sequence.
+        /// Returns the new marker so you can subscribe: ctrl.AddMarker("Boom", 1.5f).OnTrigger += OnBoom;
+        /// </summary>
+        public EventMarkerData AddMarker(string displayName, float time)
+        {
+            if (Sequence == null) return null;
+            if (Sequence.markers == null) Sequence.markers = new List<EventMarkerData>();
+
+            var marker = new EventMarkerData { displayName = displayName, time = time };
+            Sequence.markers.Add(marker);
+            _markerCache = null;
+            return marker;
+        }
+
+        /// <summary>
+        /// Remove a marker by display name or markerId. Returns true if found and removed.
+        /// </summary>
+        public bool RemoveMarker(string nameOrId)
+        {
+            if (Sequence?.markers == null) return false;
+
+            EnsureMarkerCache();
+            if (!_markerCache.TryGetValue(nameOrId, out var marker)) return false;
+
+            Sequence.markers.Remove(marker);
+            _markerCache = null;
+            return true;
         }
 
         // ── Inspector event accessors ─────────────────────────────────────────
@@ -244,6 +306,7 @@ namespace TweenAnimator
             Stop();
             clip = newClip;
             _entryCache = null;
+            _markerCache = null;
         }
 
         // ── Internal helpers ─────────────────────────────────────────────────

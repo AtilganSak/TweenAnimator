@@ -16,6 +16,7 @@ namespace TweenAnimator.Editor
         private const float MinBlockWidth = 4f;
         private const float TimelineMinSecs = 5f;
         private const float TimeRulerHeight = 20f;
+        private const float MarkerTrackHeight = 18f;
 
         // ─── State ─────────────────────────────────────────────────────────────
         private TweenAnimatorWindowState _state = new TweenAnimatorWindowState();
@@ -53,6 +54,16 @@ namespace TweenAnimator.Editor
 
         // Multi-selection
         private HashSet<TweenEntryData> _selectedEntries = new HashSet<TweenEntryData>();
+
+        // Marker state
+        private bool _markerDragging;
+        private EventMarkerData _dragMarker;
+        private float _markerDragStartMouseX;
+        private float _markerDragStartTime;
+        private string _renamingMarkerId;
+        private string _renamingMarkerName;
+        private Rect _renamingMarkerWorldRect;
+        private bool _focusMarkerRename;
 
         // ─── Styles (lazy) ─────────────────────────────────────────────────────
         private static GUIStyle _blockStyle;
@@ -138,6 +149,34 @@ namespace TweenAnimator.Editor
         private void OnGUI()
         {
             InitStyles();
+
+            if (_renamingMarkerId != null)
+            {
+                Event ev = Event.current;
+                if (ev.rawType == EventType.MouseDown && !_renamingMarkerWorldRect.Contains(ev.mousePosition))
+                {
+                    CommitMarkerRename();
+                    Repaint();
+                }
+                else if (ev.type == EventType.KeyDown)
+                {
+                    if (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter)
+                    {
+                        CommitMarkerRename();
+                        ev.Use();
+                        Repaint();
+                    }
+                    else if (ev.keyCode == KeyCode.Escape)
+                    {
+                        _renamingMarkerId = null;
+                        _renamingMarkerName = null;
+                        _focusMarkerRename = false;
+                        GUI.FocusControl(null);
+                        ev.Use();
+                        Repaint();
+                    }
+                }
+            }
 
             // Guard: controller destroyed externally (deleted from hierarchy/component removed).
             // Cannot change state mid-frame — Layout and Repaint must draw identical control sequences.
@@ -464,6 +503,7 @@ namespace TweenAnimator.Editor
             _scrollPos = GUILayout.BeginScrollView(_scrollPos, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(availableHeight));
 
             DrawTimeRuler();
+            DrawMarkerTrack(seq, ctrl);
 
             _cachedTracks = GetTrackGroups(seq.entries);
             var tracks = _cachedTracks;
@@ -601,6 +641,7 @@ namespace TweenAnimator.Editor
                 Repaint();
             }
 
+
             // Playhead
             float phX = LabelWidth + (_state.CurrentTime - _timelineScrollX) * _pixelsPerSec;
             if (phX >= LabelWidth)
@@ -705,6 +746,173 @@ namespace TweenAnimator.Editor
                 EditorGUI.DrawRect(new Rect(phX - 1, trackRect.y, 2, trackRect.height), new Color(1f, 0.3f, 0.3f, 0.85f));
 
             GUILayout.EndHorizontal();
+        }
+
+        private void DrawMarkerTrack(TweenSequenceData seq, TweenAnimatorController ctrl)
+        {
+            if (seq.markers == null) seq.markers = new System.Collections.Generic.List<EventMarkerData>();
+
+            GUILayout.BeginHorizontal(GUILayout.Height(MarkerTrackHeight));
+
+            Rect labelRect = GUILayoutUtility.GetRect(LabelWidth, MarkerTrackHeight,
+                GUILayout.Width(LabelWidth), GUILayout.Height(MarkerTrackHeight));
+            EditorGUI.DrawRect(labelRect, new Color(0.13f, 0.12f, 0.10f, 0.7f));
+            GUI.Label(new Rect(labelRect.x + 20, labelRect.y + 1, labelRect.width - 40, labelRect.height),
+                "Event Markers", EditorStyles.miniLabel);
+
+            Rect addRect = new Rect(labelRect.xMax - 18, labelRect.y + 1, 18, 16);
+            if (GUI.Button(addRect, new GUIContent("+", "Add marker at playhead"), EditorStyles.miniButton))
+            {
+                Undo.RecordObject(ctrl.Clip, "Add Event Marker");
+                var m = new EventMarkerData { time = SnapValue(Mathf.Max(0f, _state.CurrentTime)) };
+                seq.markers.Add(m);
+                EditorUtility.SetDirty(ctrl.Clip);
+                _renamingMarkerId = m.markerId;
+                _renamingMarkerName = m.displayName;
+                _focusMarkerRename = true;
+                Repaint();
+            }
+
+            Rect trackRect = GUILayoutUtility.GetRect(
+                position.width - LabelWidth, MarkerTrackHeight,
+                GUILayout.ExpandWidth(true), GUILayout.Height(MarkerTrackHeight));
+            EditorGUI.DrawRect(trackRect, new Color(0.09f, 0.09f, 0.07f, 0.6f));
+
+            float phX = trackRect.x + (_state.CurrentTime - _timelineScrollX) * _pixelsPerSec;
+            if (phX >= trackRect.x)
+                EditorGUI.DrawRect(new Rect(phX - 1, trackRect.y, 2, trackRect.height), new Color(1f, 0.3f, 0.3f, 0.85f));
+
+            Event e = Event.current;
+
+            for (int mi = seq.markers.Count - 1; mi >= 0; mi--)
+            {
+                var marker = seq.markers[mi];
+                float mx = trackRect.x + (marker.time - _timelineScrollX) * _pixelsPerSec;
+                if (mx < trackRect.x - 12f || mx > trackRect.xMax + 12f) continue;
+
+                Color markerColor = marker.isEnabled
+                    ? new Color(1f, 0.82f, 0.1f, 0.95f)
+                    : new Color(0.5f, 0.5f, 0.5f, 0.5f);
+
+                // Diamond pin cap (rotated square)
+                float capSize = 7f;
+                float capCenterY = trackRect.y + capSize * 0.5f + 1f;
+                Matrix4x4 savedMatrix = GUI.matrix;
+                GUIUtility.RotateAroundPivot(45f, new Vector2(mx, capCenterY));
+                EditorGUI.DrawRect(new Rect(mx - capSize * 0.5f, capCenterY - capSize * 0.5f, capSize, capSize), markerColor);
+                GUI.matrix = savedMatrix;
+
+                // Stem
+                float stemTop = capCenterY + capSize * 0.5f;
+                EditorGUI.DrawRect(new Rect(mx - 0.5f, stemTop, 1f, trackRect.yMax - stemTop - 1f), markerColor);
+
+                // Hit rect around pin
+                Rect hitRect = new Rect(mx - 6, trackRect.y, 12, trackRect.height);
+
+                // Label — right of pin, or a rename text field
+                if (marker.markerId == _renamingMarkerId)
+                {
+                    string controlName = "MarkerRename_" + marker.markerId;
+                    GUI.SetNextControlName(controlName);
+                    Rect renameRect = new Rect(mx + 4, trackRect.y + 1, 70, MarkerTrackHeight - 3);
+                    _renamingMarkerWorldRect = renameRect;
+                    _renamingMarkerName = GUI.TextField(renameRect, _renamingMarkerName ?? marker.displayName, EditorStyles.miniTextField);
+                    if (_focusMarkerRename)
+                    {
+                        EditorGUI.FocusTextInControl(controlName);
+                        _focusMarkerRename = false;
+                    }
+                }
+                else
+                {
+                    GUI.Label(new Rect(mx + 5, trackRect.y + 1, 80, trackRect.height),
+                        marker.displayName, EditorStyles.miniLabel);
+                }
+
+                // Right-click context menu
+                if (e.type == EventType.ContextClick && hitRect.Contains(e.mousePosition))
+                {
+                    var capturedMarker = marker;
+                    var capturedSeq = seq;
+                    var menu = new GenericMenu();
+                    menu.AddItem(new GUIContent("Rename"), false, () =>
+                    {
+                        _renamingMarkerId = capturedMarker.markerId;
+                        _renamingMarkerName = capturedMarker.displayName;
+                        _focusMarkerRename = true;
+                        Repaint();
+                    });
+                    menu.AddItem(new GUIContent(capturedMarker.isEnabled ? "Disable" : "Enable"), false, () =>
+                    {
+                        Undo.RecordObject(ctrl.Clip, "Toggle Marker");
+                        capturedMarker.isEnabled = !capturedMarker.isEnabled;
+                        EditorUtility.SetDirty(ctrl.Clip);
+                    });
+                    menu.AddSeparator("");
+                    menu.AddItem(new GUIContent("Delete"), false, () =>
+                    {
+                        Undo.RecordObject(ctrl.Clip, "Delete Marker");
+                        capturedSeq.markers.Remove(capturedMarker);
+                        if (_renamingMarkerId == capturedMarker.markerId) _renamingMarkerId = null;
+                        EditorUtility.SetDirty(ctrl.Clip);
+                        Repaint();
+                    });
+                    menu.ShowAsContext();
+                    e.Use();
+                    GUILayout.EndHorizontal();
+                    return;
+                }
+
+                // Left-click drag on pin
+                if (e.type == EventType.MouseDown && e.button == 0 && hitRect.Contains(e.mousePosition))
+                {
+                    if (_renamingMarkerId != null && _renamingMarkerId != marker.markerId)
+                    {
+                        // Commit pending rename before starting drag
+                        var renaming = seq.markers.Find(m => m.markerId == _renamingMarkerId);
+                        if (renaming != null)
+                        {
+                            Undo.RecordObject(ctrl.Clip, "Rename Marker");
+                            renaming.displayName = _renamingMarkerName ?? renaming.displayName;
+                            EditorUtility.SetDirty(ctrl.Clip);
+                        }
+
+                        _renamingMarkerId = null;
+                        _renamingMarkerName = null;
+                    }
+
+                    _markerDragging = true;
+                    _dragMarker = marker;
+                    _markerDragStartMouseX = e.mousePosition.x;
+                    _markerDragStartTime = marker.time;
+                    e.Use();
+                    GUILayout.EndHorizontal();
+                    return;
+                }
+            }
+
+            GUILayout.EndHorizontal();
+        }
+
+        private void CommitMarkerRename()
+        {
+            if (_renamingMarkerId == null) return;
+            var seq = _state.Controller?.Sequence;
+            var clip = _state.Controller?.Clip;
+            if (seq?.markers != null && clip != null)
+            {
+                var m = seq.markers.Find(x => x.markerId == _renamingMarkerId);
+                if (m != null)
+                {
+                    Undo.RecordObject(clip, "Rename Marker");
+                    m.displayName = string.IsNullOrEmpty(_renamingMarkerName) ? m.displayName : _renamingMarkerName;
+                    EditorUtility.SetDirty(clip);
+                }
+            }
+
+            _renamingMarkerId = null;
+            _renamingMarkerName = null;
+            GUI.FocusControl(null);
         }
 
         private void DrawBlock(TweenEntryData entry, Rect trackRect, TweenAnimatorController ctrl, TweenSequenceData seq, Color trackColor)
@@ -919,6 +1127,28 @@ namespace TweenAnimator.Editor
         private void HandleDrag()
         {
             Event e = Event.current;
+
+            // Marker drag
+            if (_markerDragging)
+            {
+                if (e.type == EventType.MouseDrag)
+                {
+                    float delta = (e.mousePosition.x - _markerDragStartMouseX) / _pixelsPerSec;
+                    Undo.RecordObject(_state.Controller.Clip, "Move Event Marker");
+                    _dragMarker.time = SnapValue(Mathf.Max(0f, _markerDragStartTime + delta), e.control);
+                    EditorUtility.SetDirty(_state.Controller.Clip);
+                    e.Use();
+                    Repaint();
+                }
+                else if (e.type == EventType.MouseUp)
+                {
+                    _markerDragging = false;
+                    _dragMarker = null;
+                    e.Use();
+                }
+
+                return;
+            }
 
             // Scrub drag
             if (_scrubDragging)

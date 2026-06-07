@@ -12,6 +12,7 @@ namespace TweenAnimator
         public bool playOnAwake;
         public bool autoKillOnComplete = true;
         public List<TweenEntryData> entries = new List<TweenEntryData>();
+        public List<EventMarkerData> markers = new List<EventMarkerData>();
 
         public float TotalDuration
         {
