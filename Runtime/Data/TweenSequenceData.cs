@@ -7,11 +7,11 @@ namespace TweenAnimator
     [Serializable]
     public class TweenSequenceData
     {
-        public string              displayName       = "Sequence";
-        public float               timeScale         = 1f;
-        public bool                playOnAwake;
-        public bool                autoKillOnComplete = true;
-        public List<TweenEntryData> entries          = new List<TweenEntryData>();
+        public string displayName = "Sequence";
+        public float timeScale = 1f;
+        public bool playOnAwake;
+        public bool autoKillOnComplete = true;
+        public List<TweenEntryData> entries = new List<TweenEntryData>();
 
         public float TotalDuration
         {

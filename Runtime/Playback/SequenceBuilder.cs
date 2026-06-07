@@ -63,6 +63,7 @@ namespace TweenAnimator
                         startVal = linked.endValue;
                     tween = accessor.BuildTweenFrom(component, entry, startVal);
                 }
+
                 seq.Insert(entry.delay, tween);
 
                 if (entry.loops >= 0)
@@ -107,6 +108,7 @@ namespace TweenAnimator
                 t = assembly.GetType(typeName);
                 if (t != null) return t;
             }
+
             return null;
         }
     }

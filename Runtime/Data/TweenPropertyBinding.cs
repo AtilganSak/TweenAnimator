@@ -8,8 +8,10 @@ namespace TweenAnimator
     {
         // Transform path relative to the TweenAnimatorController (empty = self)
         public string hierarchyPath;
+
         // e.g. "UnityEngine.Transform"
         public string componentTypeName;
+
         // e.g. "localPosition"
         public string propertyName;
         public PropertyAxis axis;

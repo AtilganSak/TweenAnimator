@@ -6,13 +6,13 @@ namespace TweenAnimator.Editor
 {
     public class DiscoveredProperty
     {
-        public string       HierarchyPath;
-        public string       ComponentTypeName;
-        public string       ComponentShortName;
-        public string       PropertyName;
-        public string       DisplayName;
+        public string HierarchyPath;
+        public string ComponentTypeName;
+        public string ComponentShortName;
+        public string PropertyName;
+        public string DisplayName;
         public PropertyType ValueType;
-        public GameObject   OwnerObject;
+        public GameObject OwnerObject;
     }
 
     public static class ComponentPropertyScanner
@@ -39,13 +39,13 @@ namespace TweenAnimator.Editor
                 {
                     results.Add(new DiscoveredProperty
                     {
-                        HierarchyPath      = path,
-                        ComponentTypeName  = typeName,
+                        HierarchyPath = path,
+                        ComponentTypeName = typeName,
                         ComponentShortName = component.GetType().Name,
-                        PropertyName       = desc.PropertyName,
-                        DisplayName        = desc.DisplayName,
-                        ValueType          = desc.ValueType,
-                        OwnerObject        = current.gameObject
+                        PropertyName = desc.PropertyName,
+                        DisplayName = desc.DisplayName,
+                        ValueType = desc.ValueType,
+                        OwnerObject = current.gameObject
                     });
                 }
             }

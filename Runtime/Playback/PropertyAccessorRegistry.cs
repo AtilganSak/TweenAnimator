@@ -6,13 +6,17 @@ using UnityEngine.UI;
 
 namespace TweenAnimator
 {
-    public enum ExtraParamType { None, RotateMode }
+    public enum ExtraParamType
+    {
+        None,
+        RotateMode
+    }
 
     public class PropertyDescriptor
     {
-        public string         PropertyName;
-        public string         DisplayName;
-        public PropertyType   ValueType;
+        public string PropertyName;
+        public string DisplayName;
+        public PropertyType ValueType;
         public ExtraParamType ExtraParam;
     }
 
@@ -27,24 +31,24 @@ namespace TweenAnimator
         static PropertyAccessorRegistry()
         {
             // Transform
-            RegisterVector3<Transform>("localPosition",    "Local Position",
-                c => c.localPosition,    (c, v) => c.localPosition    = v);
+            RegisterVector3<Transform>("localPosition", "Local Position",
+                c => c.localPosition, (c, v) => c.localPosition = v);
             RegisterRotation<Transform>("localEulerAngles", "Local Rotation", isLocal: true);
-            RegisterVector3<Transform>("localScale",       "Local Scale",
-                c => c.localScale,       (c, v) => c.localScale       = v);
-            RegisterVector3<Transform>("position",         "Position (World)",
-                c => c.position,         (c, v) => c.position         = v);
+            RegisterVector3<Transform>("localScale", "Local Scale",
+                c => c.localScale, (c, v) => c.localScale = v);
+            RegisterVector3<Transform>("position", "Position (World)",
+                c => c.position, (c, v) => c.position = v);
 
             // RectTransform (UI)
-            RegisterVector3<RectTransform>("localPosition",    "Local Position",
-                c => c.localPosition,    (c, v) => c.localPosition    = v);
+            RegisterVector3<RectTransform>("localPosition", "Local Position",
+                c => c.localPosition, (c, v) => c.localPosition = v);
             RegisterRotation<RectTransform>("localEulerAngles", "Local Rotation", isLocal: true);
-            RegisterVector3<RectTransform>("localScale",       "Local Scale",
-                c => c.localScale,       (c, v) => c.localScale       = v);
+            RegisterVector3<RectTransform>("localScale", "Local Scale",
+                c => c.localScale, (c, v) => c.localScale = v);
             RegisterVector2<RectTransform>("anchoredPosition", "Anchored Position",
                 c => c.anchoredPosition, (c, v) => c.anchoredPosition = v);
-            RegisterVector2<RectTransform>("sizeDelta",        "Size Delta",
-                c => c.sizeDelta,        (c, v) => c.sizeDelta        = v);
+            RegisterVector2<RectTransform>("sizeDelta", "Size Delta",
+                c => c.sizeDelta, (c, v) => c.sizeDelta = v);
 
             // CanvasGroup
             RegisterFloat<CanvasGroup>("alpha", "Alpha",
@@ -108,12 +112,13 @@ namespace TweenAnimator
                 list = new List<PropertyDescriptor>();
                 _byType[typeName] = list;
             }
+
             list.Add(new PropertyDescriptor
             {
                 PropertyName = propName,
-                DisplayName  = displayName,
-                ValueType    = PropertyType.Vector3,
-                ExtraParam   = ExtraParamType.RotateMode
+                DisplayName = displayName,
+                ValueType = PropertyType.Vector3,
+                ExtraParam = ExtraParamType.RotateMode
             });
         }
 
@@ -161,7 +166,8 @@ namespace TweenAnimator
         {
             if (!_byType.TryGetValue(componentTypeName, out var list)) return null;
             foreach (var d in list)
-                if (d.PropertyName == propertyName) return d;
+                if (d.PropertyName == propertyName)
+                    return d;
             return null;
         }
 
@@ -172,6 +178,7 @@ namespace TweenAnimator
                 list = new List<PropertyDescriptor>();
                 _byType[typeName] = list;
             }
+
             list.Add(new PropertyDescriptor { PropertyName = propName, DisplayName = displayName, ValueType = valueType });
         }
 

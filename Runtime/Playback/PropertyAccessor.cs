@@ -6,15 +6,15 @@ namespace TweenAnimator
 {
     public abstract class PropertyAccessor
     {
-        public abstract Tween  BuildTween(Component target, TweenEntryData entry);
-        public abstract Tween  BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from);
-        public abstract void   ApplyValue(Component target, PropertyValueUnion value);
+        public abstract Tween BuildTween(Component target, TweenEntryData entry);
+        public abstract Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from);
+        public abstract void ApplyValue(Component target, PropertyValueUnion value);
         public abstract PropertyValueUnion ReadValue(Component target);
     }
 
     public sealed class Vector3PropertyAccessor : PropertyAccessor
     {
-        private readonly Func<Component, Vector3>   _getter;
+        private readonly Func<Component, Vector3> _getter;
         private readonly Action<Component, Vector3> _setter;
 
         public Vector3PropertyAccessor(Func<Component, Vector3> getter, Action<Component, Vector3> setter)
@@ -27,17 +27,17 @@ namespace TweenAnimator
         {
             Vector3 end = entry.endValue.vector3Value;
             return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
         {
             Vector3 start = from.vector3Value;
-            Vector3 end   = entry.endValue.vector3Value;
+            Vector3 end = entry.endValue.vector3Value;
             return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override void ApplyValue(Component target, PropertyValueUnion value) =>
@@ -49,7 +49,7 @@ namespace TweenAnimator
 
     public sealed class FloatPropertyAccessor : PropertyAccessor
     {
-        private readonly Func<Component, float>   _getter;
+        private readonly Func<Component, float> _getter;
         private readonly Action<Component, float> _setter;
 
         public FloatPropertyAccessor(Func<Component, float> getter, Action<Component, float> setter)
@@ -62,17 +62,17 @@ namespace TweenAnimator
         {
             float end = entry.endValue.floatValue;
             return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
         {
             float start = from.floatValue;
-            float end   = entry.endValue.floatValue;
+            float end = entry.endValue.floatValue;
             return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override void ApplyValue(Component target, PropertyValueUnion value) =>
@@ -84,7 +84,7 @@ namespace TweenAnimator
 
     public sealed class Vector2PropertyAccessor : PropertyAccessor
     {
-        private readonly Func<Component, Vector2>   _getter;
+        private readonly Func<Component, Vector2> _getter;
         private readonly Action<Component, Vector2> _setter;
 
         public Vector2PropertyAccessor(Func<Component, Vector2> getter, Action<Component, Vector2> setter)
@@ -97,17 +97,17 @@ namespace TweenAnimator
         {
             Vector2 end = entry.endValue.vector2Value;
             return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
         {
             Vector2 start = from.vector2Value;
-            Vector2 end   = entry.endValue.vector2Value;
+            Vector2 end = entry.endValue.vector2Value;
             return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override void ApplyValue(Component target, PropertyValueUnion value) =>
@@ -125,30 +125,34 @@ namespace TweenAnimator
 
         public override Tween BuildTween(Component target, TweenEntryData entry)
         {
-            var t   = (Transform)target;
+            var t = (Transform)target;
             Vector3 end = entry.endValue.vector3Value;
             Tween tw = _isLocal
                 ? t.DOLocalRotate(end, entry.EffectiveDuration, entry.rotateMode)
-                : t.DORotate     (end, entry.EffectiveDuration, entry.rotateMode);
+                : t.DORotate(end, entry.EffectiveDuration, entry.rotateMode);
             return tw.SetEase(entry.ease).SetLoops(entry.loops, entry.loopType);
         }
 
         public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
         {
-            var t     = (Transform)target;
+            var t = (Transform)target;
             Vector3 start = from.vector3Value;
-            Vector3 end   = entry.endValue.vector3Value;
+            Vector3 end = entry.endValue.vector3Value;
             // Explicit start: use DOTween.To for linear euler interpolation from baked start value
-            return DOTween.To(() => start, v => { if (_isLocal) t.localEulerAngles = v; else t.eulerAngles = v; }, end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+            return DOTween.To(() => start, v =>
+                {
+                    if (_isLocal) t.localEulerAngles = v;
+                    else t.eulerAngles = v;
+                }, end, entry.EffectiveDuration)
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override void ApplyValue(Component target, PropertyValueUnion value)
         {
             var t = (Transform)target;
             if (_isLocal) t.localEulerAngles = value.vector3Value;
-            else          t.eulerAngles      = value.vector3Value;
+            else t.eulerAngles = value.vector3Value;
         }
 
         public override PropertyValueUnion ReadValue(Component target)
@@ -160,7 +164,7 @@ namespace TweenAnimator
 
     public sealed class ColorPropertyAccessor : PropertyAccessor
     {
-        private readonly Func<Component, Color>   _getter;
+        private readonly Func<Component, Color> _getter;
         private readonly Action<Component, Color> _setter;
 
         public ColorPropertyAccessor(Func<Component, Color> getter, Action<Component, Color> setter)
@@ -173,17 +177,17 @@ namespace TweenAnimator
         {
             Color end = entry.endValue.colorValue;
             return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
         {
             Color start = from.colorValue;
-            Color end   = entry.endValue.colorValue;
+            Color end = entry.endValue.colorValue;
             return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                          .SetEase(entry.ease)
-                          .SetLoops(entry.loops, entry.loopType);
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
         }
 
         public override void ApplyValue(Component target, PropertyValueUnion value) =>

@@ -54,12 +54,12 @@ namespace TweenAnimator.Editor
 
                 // Sequence settings
                 EditorGUI.BeginChangeCheck();
-                float newTimeScale   = EditorGUILayout.FloatField("Time Scale",    seq.timeScale);
-                bool  newPlayOnAwake = EditorGUILayout.Toggle    ("Play On Awake", seq.playOnAwake);
+                float newTimeScale = EditorGUILayout.FloatField("Time Scale", seq.timeScale);
+                bool newPlayOnAwake = EditorGUILayout.Toggle("Play On Awake", seq.playOnAwake);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(ctrl.Clip, "Edit Sequence Settings");
-                    seq.timeScale   = newTimeScale;
+                    seq.timeScale = newTimeScale;
                     seq.playOnAwake = newPlayOnAwake;
                     EditorUtility.SetDirty(ctrl.Clip);
                 }
@@ -68,7 +68,7 @@ namespace TweenAnimator.Editor
 
                 // Read-only summary
                 EditorGUI.BeginDisabledGroup(true);
-                EditorGUILayout.LabelField("Entries",  seq.entries.Count.ToString());
+                EditorGUILayout.LabelField("Entries", seq.entries.Count.ToString());
                 EditorGUILayout.LabelField("Duration", $"{seq.TotalDuration:F2}s");
                 EditorGUI.EndDisabledGroup();
 
@@ -77,9 +77,9 @@ namespace TweenAnimator.Editor
                 // Runtime-only controls
                 EditorGUI.BeginDisabledGroup(!EditorApplication.isPlaying);
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Play"))   ctrl.Play();
-                if (GUILayout.Button("Pause"))  ctrl.Pause();
-                if (GUILayout.Button("Stop"))   ctrl.Stop();
+                if (GUILayout.Button("Play")) ctrl.Play();
+                if (GUILayout.Button("Pause")) ctrl.Pause();
+                if (GUILayout.Button("Stop")) ctrl.Stop();
                 if (GUILayout.Button("Rewind")) ctrl.Rewind();
                 GUILayout.EndHorizontal();
                 EditorGUI.EndDisabledGroup();

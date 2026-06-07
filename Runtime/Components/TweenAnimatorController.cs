@@ -6,10 +6,11 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [assembly: InternalsVisibleTo("TweenAnimator.Editor")]
-
 namespace TweenAnimator
 {
-    [Serializable] public class TweenLoopUnityEvent : UnityEvent<int> { }
+    [Serializable] public class TweenLoopUnityEvent : UnityEvent<int>
+    {
+    }
 
     [DisallowMultipleComponent]
     [AddComponentMenu("TweenAnimator/Tween Animator Controller")]
@@ -18,25 +19,26 @@ namespace TweenAnimator
         [SerializeField] private TweenAnimatorClip clip;
 
         [Header("Events")]
-        [SerializeField] private UnityEvent        _onPlay     = new UnityEvent();
-        [SerializeField] private UnityEvent        _onPause    = new UnityEvent();
-        [SerializeField] private UnityEvent        _onStop     = new UnityEvent();
-        [SerializeField] private UnityEvent        _onComplete = new UnityEvent();
-        [SerializeField] private TweenLoopUnityEvent _onLoop   = new TweenLoopUnityEvent();
+        [SerializeField] private UnityEvent _onPlay = new UnityEvent();
+
+        [SerializeField] private UnityEvent _onPause = new UnityEvent();
+        [SerializeField] private UnityEvent _onStop = new UnityEvent();
+        [SerializeField] private UnityEvent _onComplete = new UnityEvent();
+        [SerializeField] private TweenLoopUnityEvent _onLoop = new TweenLoopUnityEvent();
 
         // C# events for code subscribers
-        public event Action      OnPlay;
-        public event Action      OnPause;
-        public event Action      OnStop;
-        public event Action      OnComplete;
+        public event Action OnPlay;
+        public event Action OnPause;
+        public event Action OnStop;
+        public event Action OnComplete;
         public event Action<int> OnLoop;
 
         private Sequence _builtSequence;
-        private bool     _isComplete;
+        private bool _isComplete;
         private Dictionary<string, TweenEntryData> _entryCache;
 
         // ── Clip ─────────────────────────────────────────────────────────────
-        public TweenAnimatorClip Clip     => clip;
+        public TweenAnimatorClip Clip => clip;
         public TweenSequenceData Sequence => clip != null ? clip.Data : null;
 
         // ── State ─────────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ namespace TweenAnimator
         public bool IsPlaying => _builtSequence != null && _builtSequence.IsActive() && _builtSequence.IsPlaying();
 
         /// <summary>Sequence is built but paused mid-playback.</summary>
-        public bool IsPaused  => _builtSequence != null && _builtSequence.IsActive() && !_builtSequence.IsPlaying();
+        public bool IsPaused => _builtSequence != null && _builtSequence.IsActive() && !_builtSequence.IsPlaying();
 
         /// <summary>True after the sequence played to its end (reset on next Play).</summary>
         public bool IsComplete => _isComplete;
@@ -54,7 +56,8 @@ namespace TweenAnimator
 
         /// <summary>Elapsed playback time in seconds.</summary>
         public float CurrentTime => (_builtSequence != null && _builtSequence.IsActive())
-            ? _builtSequence.Elapsed(false) : 0f;
+            ? _builtSequence.Elapsed(false)
+            : 0f;
 
         /// <summary>Elapsed time as 0–1 normalized value.</summary>
         public float NormalizedTime => Duration > 0f ? Mathf.Clamp01(CurrentTime / Duration) : 0f;
@@ -116,11 +119,11 @@ namespace TweenAnimator
         }
 
         // ── Inspector event accessors ─────────────────────────────────────────
-        public UnityEvent         OnPlayEvent     => _onPlay;
-        public UnityEvent         OnPauseEvent    => _onPause;
-        public UnityEvent         OnStopEvent     => _onStop;
-        public UnityEvent         OnCompleteEvent => _onComplete;
-        public TweenLoopUnityEvent OnLoopEvent    => _onLoop;
+        public UnityEvent OnPlayEvent => _onPlay;
+        public UnityEvent OnPauseEvent => _onPause;
+        public UnityEvent OnStopEvent => _onStop;
+        public UnityEvent OnCompleteEvent => _onComplete;
+        public TweenLoopUnityEvent OnLoopEvent => _onLoop;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
         private void Awake()
@@ -239,7 +242,7 @@ namespace TweenAnimator
         public void SetClip(TweenAnimatorClip newClip)
         {
             Stop();
-            clip        = newClip;
+            clip = newClip;
             _entryCache = null;
         }
 
@@ -257,7 +260,7 @@ namespace TweenAnimator
         {
             if (_builtSequence != null && _builtSequence.IsActive()) return;
             if (Sequence == null) return;
-            _isComplete    = false;
+            _isComplete = false;
             _builtSequence = Build();
             _builtSequence.Pause();
         }

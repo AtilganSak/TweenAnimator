@@ -9,8 +9,8 @@ namespace TweenAnimator.Editor
     public class PropertyPickerWindow : EditorWindow
     {
         private Action<TweenPropertyBinding> _onSelected;
-        private List<DiscoveredProperty>     _all;
-        private List<DiscoveredProperty>     _filtered;
+        private List<DiscoveredProperty> _all;
+        private List<DiscoveredProperty> _filtered;
 
         // Left column selection
         private string _selectedObject = "";
@@ -21,10 +21,10 @@ namespace TweenAnimator.Editor
         {
             var w = CreateInstance<PropertyPickerWindow>();
             w.titleContent = new GUIContent("Add Property");
-            w._onSelected  = onSelected;
-            w._all         = ComponentPropertyScanner.Scan(root);
-            w._filtered    = new List<DiscoveredProperty>(w._all);
-            w.minSize      = new Vector2(500, 350);
+            w._onSelected = onSelected;
+            w._all = ComponentPropertyScanner.Scan(root);
+            w._filtered = new List<DiscoveredProperty>(w._all);
+            w.minSize = new Vector2(500, 350);
             w.ShowUtility();
         }
 
@@ -50,7 +50,7 @@ namespace TweenAnimator.Editor
                 GUIStyle style = sel ? EditorStyles.selectionRect : EditorStyles.label;
 
                 if (GUILayout.Button(obj, sel ? EditorStyles.boldLabel : EditorStyles.label,
-                    GUILayout.ExpandWidth(true)))
+                        GUILayout.ExpandWidth(true)))
                 {
                     _selectedObject = sel ? "" : obj;
                     RefreshFilter();
@@ -103,10 +103,10 @@ namespace TweenAnimator.Editor
         {
             var binding = new TweenPropertyBinding
             {
-                hierarchyPath     = prop.HierarchyPath,
+                hierarchyPath = prop.HierarchyPath,
                 componentTypeName = prop.ComponentTypeName,
-                propertyName      = prop.PropertyName,
-                axis              = PropertyAxis.None
+                propertyName = prop.PropertyName,
+                axis = PropertyAxis.None
             };
             _onSelected?.Invoke(binding);
             Close();

@@ -8,48 +8,55 @@ namespace TweenAnimator.Editor
     public class TweenAnimatorWindow : EditorWindow
     {
         // ─── Layout constants ──────────────────────────────────────────────────
-        private const float LabelWidth       = 220f;
-        private const float TimelineHeight   = 24f;
-        private const float HeaderHeight     = 22f;
+        private const float LabelWidth = 220f;
+        private const float TimelineHeight = 24f;
+        private const float HeaderHeight = 22f;
         private float _inspectorActualHeight = 180f; // measured each Repaint, used next frame
-        private const float HandleWidth      = 8f;
-        private const float MinBlockWidth    = 4f;
-        private const float TimelineMinSecs  = 5f;
-        private const float TimeRulerHeight  = 20f;
+        private const float HandleWidth = 8f;
+        private const float MinBlockWidth = 4f;
+        private const float TimelineMinSecs = 5f;
+        private const float TimeRulerHeight = 20f;
 
         // ─── State ─────────────────────────────────────────────────────────────
         private TweenAnimatorWindowState _state = new TweenAnimatorWindowState();
         private Vector2 _scrollPos;
 
         // Timeline view
-        private float _viewDuration    = 5f;
-        private float _pixelsPerSec    = 100f;
-        private float _timelineScrollX = 0f;   // seconds offset (pan)
+        private float _viewDuration = 5f;
+        private float _pixelsPerSec = 100f;
+        private float _timelineScrollX = 0f; // seconds offset (pan)
 
         // Pan state
-        private bool  _panDragging;
+        private bool _panDragging;
         private float _panStartMouseX;
         private float _panStartScrollX;
 
         // Drag state
-        private enum DragMode { None, MoveBlock, ResizeLeft, ResizeRight }
-        private DragMode       _dragMode;
+        private enum DragMode
+        {
+            None,
+            MoveBlock,
+            ResizeLeft,
+            ResizeRight
+        }
+
+        private DragMode _dragMode;
         private TweenEntryData _dragEntry;
-        private float          _dragStartMouseX;
-        private float          _dragStartDelay;
-        private float          _dragStartDuration;
-        private bool           _scrubDragging;
-        private float          _dragAccumulatedY;
-        private List<List<TweenEntryData>> _cachedTracks    = new List<List<TweenEntryData>>();
-        private HashSet<string>            _missingEntryIds = new HashSet<string>();
+        private float _dragStartMouseX;
+        private float _dragStartDelay;
+        private float _dragStartDuration;
+        private bool _scrubDragging;
+        private float _dragAccumulatedY;
+        private List<List<TweenEntryData>> _cachedTracks = new List<List<TweenEntryData>>();
+        private HashSet<string> _missingEntryIds = new HashSet<string>();
 
         // ─── Styles (lazy) ─────────────────────────────────────────────────────
         private static GUIStyle _blockStyle;
         private static GUIStyle _labelStyle;
         private static GUIStyle _headerStyle;
         private static GUIStyle _whiteMiniLabel;
-        private static Color    _blockColorOff   = new Color(0.4f,  0.4f,  0.4f, 0.6f);
-        private static Color    _tickColor       = new Color(0.5f,  0.5f,  0.5f, 1f);
+        private static Color _blockColorOff = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+        private static Color _tickColor = new Color(0.5f, 0.5f, 0.5f, 1f);
 
         private static readonly Color[] _palette = new[]
         {
@@ -74,14 +81,14 @@ namespace TweenAnimator.Editor
         // ─── Lifecycle ─────────────────────────────────────────────────────────
         private void OnEnable()
         {
-            Selection.selectionChanged             += OnSelectionChanged;
+            Selection.selectionChanged += OnSelectionChanged;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             _state.Evaluate();
         }
 
         private void OnDisable()
         {
-            Selection.selectionChanged             -= OnSelectionChanged;
+            Selection.selectionChanged -= OnSelectionChanged;
             EditorApplication.playModeStateChanged -= OnPlayModeChanged;
             _state.ExitPreviewMode();
         }
@@ -105,7 +112,12 @@ namespace TweenAnimator.Editor
             if (_state.Controller?.Sequence == null) return;
             foreach (var entry in _state.Controller.Sequence.entries)
             {
-                if (entry.binding == null) { _missingEntryIds.Add(entry.entryId); continue; }
+                if (entry.binding == null)
+                {
+                    _missingEntryIds.Add(entry.entryId);
+                    continue;
+                }
+
                 var comp = TweenAnimatorWindowState.ResolveComponent(_state.Controller, entry.binding);
                 if (comp == null) _missingEntryIds.Add(entry.entryId);
             }
@@ -128,7 +140,11 @@ namespace TweenAnimator.Editor
             if (_state.Mode == WindowMode.HasController && !_state.Controller)
             {
                 if (Event.current.type == EventType.Layout)
-                    EditorApplication.delayCall += () => { _state.Evaluate(); Repaint(); };
+                    EditorApplication.delayCall += () =>
+                    {
+                        _state.Evaluate();
+                        Repaint();
+                    };
                 DrawNoSelection();
                 return;
             }
@@ -150,10 +166,10 @@ namespace TweenAnimator.Editor
 
             switch (_state.Mode)
             {
-                case WindowMode.NoSelection:   DrawNoSelection();   break;
-                case WindowMode.NoComponent:   DrawNoComponent();   break;
-                case WindowMode.NoClip:        DrawNoClip();        break;
-                case WindowMode.HasController: DrawMainUI();        break;
+                case WindowMode.NoSelection: DrawNoSelection(); break;
+                case WindowMode.NoComponent: DrawNoComponent(); break;
+                case WindowMode.NoClip: DrawNoClip(); break;
+                case WindowMode.HasController: DrawMainUI(); break;
             }
 
             if (_state.IsPreviewPlaying)
@@ -217,6 +233,7 @@ namespace TweenAnimator.Editor
                 _state.Evaluate();
                 Repaint();
             }
+
             GUILayout.EndHorizontal();
 
             GUILayout.Space(4);
@@ -243,7 +260,7 @@ namespace TweenAnimator.Editor
         private void DrawMainUI()
         {
             var ctrl = _state.Controller;
-            var seq  = ctrl.Sequence;
+            var seq = ctrl.Sequence;
 
             _viewDuration = (position.width - LabelWidth) / _pixelsPerSec;
 
@@ -309,8 +326,9 @@ namespace TweenAnimator.Editor
             if (previewNow != _state.IsPreviewEnabled)
             {
                 if (previewNow) _state.EnterPreviewMode();
-                else            _state.ExitPreviewMode();
+                else _state.ExitPreviewMode();
             }
+
             EditorGUI.EndDisabledGroup();
 
             GUILayout.Space(4);
@@ -338,7 +356,7 @@ namespace TweenAnimator.Editor
 
             if (GUILayout.Button(new GUIContent("⟲ View", "Reset timeline zoom and scroll"), EditorStyles.toolbarButton, GUILayout.Width(48)))
             {
-                _pixelsPerSec    = 100f;
+                _pixelsPerSec = 100f;
                 _timelineScrollX = 0f;
                 Repaint();
             }
@@ -366,8 +384,8 @@ namespace TweenAnimator.Editor
             }
             else if (ev.type == EventType.MouseDown && ev.button == 2)
             {
-                _panDragging     = true;
-                _panStartMouseX  = ev.mousePosition.x;
+                _panDragging = true;
+                _panStartMouseX = ev.mousePosition.x;
                 _panStartScrollX = _timelineScrollX;
                 ev.Use();
             }
@@ -389,9 +407,9 @@ namespace TweenAnimator.Editor
 
             float inspectorH = _state.SelectedEntry == null ? 0f : _inspectorActualHeight;
             float availableHeight = position.height
-                - HeaderHeight
-                - TimeRulerHeight
-                - inspectorH;
+                                    - HeaderHeight
+                                    - TimeRulerHeight
+                                    - inspectorH;
 
             _scrollPos = GUILayout.BeginScrollView(_scrollPos, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(availableHeight));
 
@@ -439,7 +457,7 @@ namespace TweenAnimator.Editor
         private static List<List<TweenEntryData>> GetTrackGroups(List<TweenEntryData> entries)
         {
             var groups = new List<List<TweenEntryData>>();
-            var seen   = new Dictionary<string, List<TweenEntryData>>();
+            var seen = new Dictionary<string, List<TweenEntryData>>();
 
             foreach (var entry in entries)
             {
@@ -450,8 +468,10 @@ namespace TweenAnimator.Editor
                     seen[id] = group;
                     groups.Add(group);
                 }
+
                 group.Add(entry);
             }
+
             return groups;
         }
 
@@ -469,7 +489,8 @@ namespace TweenAnimator.Editor
         private static float PickInterval(float pixelsPerSec, float minPx)
         {
             foreach (var c in _tickCandidates)
-                if (c * pixelsPerSec >= minPx) return c;
+                if (c * pixelsPerSec >= minPx)
+                    return c;
             return _tickCandidates[_tickCandidates.Length - 1];
         }
 
@@ -491,11 +512,11 @@ namespace TweenAnimator.Editor
             float majorInterval = PickInterval(_pixelsPerSec, minPx: 55f);
 
             float startTime = _timelineScrollX;
-            float endTime   = _timelineScrollX + _viewDuration + minorInterval;
+            float endTime = _timelineScrollX + _viewDuration + minorInterval;
 
             // Minor ticks
             int firstMinor = Mathf.FloorToInt(startTime / minorInterval);
-            int lastMinor  = Mathf.CeilToInt(endTime   / minorInterval);
+            int lastMinor = Mathf.CeilToInt(endTime / minorInterval);
             for (int i = firstMinor; i <= lastMinor; i++)
             {
                 float t = i * minorInterval;
@@ -507,7 +528,7 @@ namespace TweenAnimator.Editor
 
             // Major ticks (with labels)
             int firstMajor = Mathf.FloorToInt(startTime / majorInterval);
-            int lastMajor  = Mathf.CeilToInt(endTime   / majorInterval);
+            int lastMajor = Mathf.CeilToInt(endTime / majorInterval);
             for (int i = firstMajor; i <= lastMajor; i++)
             {
                 float t = i * majorInterval;
@@ -614,7 +635,7 @@ namespace TweenAnimator.Editor
             // Track background click → scrub (fires only when no block consumed the event)
             Event evTrack = Event.current;
             if (evTrack.button == 0 && evTrack.type == EventType.MouseDown
-                && trackRect.Contains(evTrack.mousePosition))
+                                    && trackRect.Contains(evTrack.mousePosition))
             {
                 if (!_state.IsPreviewEnabled) _state.EnterPreviewMode();
                 _scrubDragging = true;
@@ -630,7 +651,6 @@ namespace TweenAnimator.Editor
                 EditorGUI.DrawRect(new Rect(phX - 1, trackRect.y, 2, trackRect.height), new Color(1f, 0.3f, 0.3f, 0.85f));
 
             GUILayout.EndHorizontal();
-
         }
 
         private void DrawBlock(TweenEntryData entry, Rect trackRect, TweenAnimatorController ctrl, TweenSequenceData seq, Color trackColor)
@@ -645,12 +665,12 @@ namespace TweenAnimator.Editor
             float clippedW = blockX + blockW - clippedX;
             if (clippedW <= 0f) return;
 
-            Rect blockRect = new Rect(blockX,    trackRect.y + 2, blockW,    trackRect.height - 4);
-            Rect drawRect  = new Rect(clippedX,  trackRect.y + 2, clippedW,  trackRect.height - 4);
+            Rect blockRect = new Rect(blockX, trackRect.y + 2, blockW, trackRect.height - 4);
+            Rect drawRect = new Rect(clippedX, trackRect.y + 2, clippedW, trackRect.height - 4);
 
             Color blockCol = !entry.isEnabled ? _blockColorOff
-                           : isSelected       ? Color.Lerp(trackColor, Color.white, 0.35f)
-                                              : trackColor;
+                : isSelected ? Color.Lerp(trackColor, Color.white, 0.35f)
+                : trackColor;
             EditorGUI.DrawRect(drawRect, blockCol);
 
             if (clippedW > 40)
@@ -660,6 +680,7 @@ namespace TweenAnimator.Editor
                     _whiteMiniLabel = new GUIStyle(EditorStyles.miniLabel);
                     _whiteMiniLabel.normal.textColor = Color.white;
                 }
+
                 GUI.Label(new Rect(clippedX + 4, drawRect.y, clippedW - 8, drawRect.height),
                     BlockLabel(entry, ctrl.transform), _whiteMiniLabel);
             }
@@ -670,7 +691,7 @@ namespace TweenAnimator.Editor
             if (e.type == EventType.ContextClick && blockRect.Contains(e.mousePosition))
             {
                 var menu = new GenericMenu();
-                var cap  = entry;
+                var cap = entry;
                 menu.AddItem(new GUIContent("Delete"), false, () =>
                 {
                     Undo.RecordObject(ctrl.Clip, "Remove Tween Entry");
@@ -687,7 +708,7 @@ namespace TweenAnimator.Editor
             // Left-click / drag
             if (e.type == EventType.MouseDown && e.button == 0)
             {
-                Rect leftHandle  = new Rect(blockRect.x, blockRect.y, HandleWidth, blockRect.height);
+                Rect leftHandle = new Rect(blockRect.x, blockRect.y, HandleWidth, blockRect.height);
                 Rect rightHandle = new Rect(blockRect.xMax - HandleWidth, blockRect.y, HandleWidth, blockRect.height);
 
                 if (leftHandle.Contains(e.mousePosition))
@@ -707,14 +728,14 @@ namespace TweenAnimator.Editor
 
             // Floating duration label while resizing
             bool isResizing = _dragEntry == entry &&
-                (_dragMode == DragMode.ResizeLeft || _dragMode == DragMode.ResizeRight);
+                              (_dragMode == DragMode.ResizeLeft || _dragMode == DragMode.ResizeRight);
             if (isResizing && Event.current.type == EventType.Repaint)
             {
-                string dLabel  = $"{entry.EffectiveDuration:F2}s";
-                Vector2 dSize  = EditorStyles.miniLabel.CalcSize(new GUIContent(dLabel));
-                float   dX     = Mathf.Clamp(blockRect.x + blockW * 0.5f - dSize.x * 0.5f,
-                                     trackRect.x, trackRect.xMax - dSize.x);
-                Rect    bgRect = new Rect(dX - 2, blockRect.y - dSize.y - 2, dSize.x + 4, dSize.y + 2);
+                string dLabel = $"{entry.EffectiveDuration:F2}s";
+                Vector2 dSize = EditorStyles.miniLabel.CalcSize(new GUIContent(dLabel));
+                float dX = Mathf.Clamp(blockRect.x + blockW * 0.5f - dSize.x * 0.5f,
+                    trackRect.x, trackRect.xMax - dSize.x);
+                Rect bgRect = new Rect(dX - 2, blockRect.y - dSize.y - 2, dSize.x + 4, dSize.y + 2);
                 EditorGUI.DrawRect(bgRect, new Color(0f, 0f, 0f, 0.75f));
                 GUI.Label(new Rect(dX, bgRect.y + 1, dSize.x, dSize.y), dLabel, EditorStyles.miniLabel);
             }
@@ -724,7 +745,7 @@ namespace TweenAnimator.Editor
         private void ShowAddPropertyMenu(TweenAnimatorController ctrl, TweenSequenceData seq)
         {
             var props = ComponentPropertyScanner.Scan(ctrl.transform);
-            var menu  = new GenericMenu();
+            var menu = new GenericMenu();
 
             foreach (var prop in props)
             {
@@ -737,10 +758,10 @@ namespace TweenAnimator.Editor
                 {
                     var binding = new TweenPropertyBinding
                     {
-                        hierarchyPath     = capturedProp.HierarchyPath,
+                        hierarchyPath = capturedProp.HierarchyPath,
                         componentTypeName = capturedProp.ComponentTypeName,
-                        propertyName      = capturedProp.PropertyName,
-                        axis              = PropertyAxis.None
+                        propertyName = capturedProp.PropertyName,
+                        axis = PropertyAxis.None
                     };
                     AddEntry(ctrl, seq, binding);
                 });
@@ -756,11 +777,11 @@ namespace TweenAnimator.Editor
         private void ShowChainMenu(TweenAnimatorController ctrl, TweenSequenceData seq, List<TweenEntryData> track)
         {
             var props = ComponentPropertyScanner.Scan(ctrl.transform);
-            var menu  = new GenericMenu();
+            var menu = new GenericMenu();
 
             foreach (var prop in props)
             {
-                var capturedProp  = prop;
+                var capturedProp = prop;
                 var capturedTrack = track;
                 string label = string.IsNullOrEmpty(prop.HierarchyPath)
                     ? $"{prop.ComponentShortName}/{prop.DisplayName}"
@@ -777,27 +798,28 @@ namespace TweenAnimator.Editor
         }
 
         private void AddChainEntry(TweenAnimatorController ctrl, TweenSequenceData seq,
-                                   List<TweenEntryData> track, DiscoveredProperty prop)
+            List<TweenEntryData> track, DiscoveredProperty prop)
         {
             float chainDelay = 0f;
             foreach (var e in track)
-                if (e.EndTime > chainDelay) chainDelay = e.EndTime;
+                if (e.EndTime > chainDelay)
+                    chainDelay = e.EndTime;
 
             var binding = new TweenPropertyBinding
             {
-                hierarchyPath     = prop.HierarchyPath,
+                hierarchyPath = prop.HierarchyPath,
                 componentTypeName = prop.ComponentTypeName,
-                propertyName      = prop.PropertyName,
+                propertyName = prop.PropertyName,
             };
 
             var entry = new TweenEntryData
             {
-                binding    = binding,
-                delay      = chainDelay,
-                trackId    = track[0].trackId,
+                binding = binding,
+                delay = chainDelay,
+                trackId = track[0].trackId,
                 trackColor = track[0].trackColor,
                 startValue = PropertyValueUnion.DefaultForType(prop.ValueType),
-                endValue   = PropertyValueUnion.DefaultForType(prop.ValueType),
+                endValue = PropertyValueUnion.DefaultForType(prop.ValueType),
             };
 
             Undo.RecordObject(ctrl.Clip, "Add Chain Tween Entry");
@@ -810,12 +832,12 @@ namespace TweenAnimator.Editor
         // ─── Drag processing ───────────────────────────────────────────────────
         private void BeginDrag(DragMode mode, TweenEntryData entry)
         {
-            _dragMode          = mode;
-            _dragEntry         = entry;
-            _dragStartMouseX   = Event.current.mousePosition.x;
-            _dragStartDelay    = entry.delay;
+            _dragMode = mode;
+            _dragEntry = entry;
+            _dragStartMouseX = Event.current.mousePosition.x;
+            _dragStartDelay = entry.delay;
             _dragStartDuration = entry.EffectiveDuration;
-            _dragAccumulatedY  = 0f;
+            _dragAccumulatedY = 0f;
             Event.current.Use();
         }
 
@@ -838,6 +860,7 @@ namespace TweenAnimator.Editor
                     _scrubDragging = false;
                     e.Use();
                 }
+
                 return;
             }
 
@@ -853,18 +876,18 @@ namespace TweenAnimator.Editor
                     case DragMode.MoveBlock:
                     {
                         float desiredDelay = SnapValue(Mathf.Max(0f, _dragStartDelay + deltaSecs), e.control);
-                        float dur          = _dragStartDuration;
+                        float dur = _dragStartDuration;
                         FindTrackGap(_dragEntry, desiredDelay, dur, out float prevEnd, out float nextStart);
                         _dragEntry.delay = Mathf.Clamp(desiredDelay, prevEnd, Mathf.Max(prevEnd, nextStart - dur));
 
                         _dragAccumulatedY += e.delta.y;
                         if (Mathf.Abs(_dragAccumulatedY) >= TimelineHeight)
                         {
-                            int dir        = _dragAccumulatedY > 0f ? 1 : -1;
+                            int dir = _dragAccumulatedY > 0f ? 1 : -1;
                             int currentIdx = _cachedTracks.FindIndex(t => t.Contains(_dragEntry));
                             if (currentIdx >= 0)
                             {
-                                int    targetIdx  = currentIdx + dir;
+                                int targetIdx = currentIdx + dir;
                                 string newTrackId = (targetIdx < 0 || targetIdx >= _cachedTracks.Count)
                                     ? System.Guid.NewGuid().ToString()
                                     : _cachedTracks[targetIdx][0].trackId;
@@ -873,18 +896,19 @@ namespace TweenAnimator.Editor
                                 _dragAccumulatedY -= dir * TimelineHeight;
                             }
                         }
+
                         break;
                     }
                     case DragMode.ResizeLeft:
                     {
-                        float newDelay  = SnapValue(Mathf.Clamp(_dragStartDelay + deltaSecs,
+                        float newDelay = SnapValue(Mathf.Clamp(_dragStartDelay + deltaSecs,
                             0f, _dragStartDelay + _dragStartDuration - 0.05f), e.control);
                         float newEffDur = _dragStartDuration - (newDelay - _dragStartDelay);
                         FindTrackGap(_dragEntry, newDelay, newEffDur, out float prevEnd, out _);
-                        newDelay        = Mathf.Max(newDelay, prevEnd);
-                        newEffDur       = _dragStartDuration - (newDelay - _dragStartDelay);
+                        newDelay = Mathf.Max(newDelay, prevEnd);
+                        newEffDur = _dragStartDuration - (newDelay - _dragStartDelay);
                         _dragEntry.duration = newEffDur * Mathf.Max(0.001f, _dragEntry.speed);
-                        _dragEntry.delay    = newDelay;
+                        _dragEntry.delay = newDelay;
                         break;
                     }
                     case DragMode.ResizeRight:
@@ -903,16 +927,16 @@ namespace TweenAnimator.Editor
             }
             else if (e.type == EventType.MouseUp)
             {
-                _dragMode  = DragMode.None;
+                _dragMode = DragMode.None;
                 _dragEntry = null;
                 e.Use();
             }
         }
 
         private void FindTrackGap(TweenEntryData dragged, float desiredDelay, float duration,
-                                   out float prevEnd, out float nextStart)
+            out float prevEnd, out float nextStart)
         {
-            prevEnd   = 0f;
+            prevEnd = 0f;
             nextStart = float.MaxValue;
 
             foreach (var track in _cachedTracks)
@@ -922,10 +946,11 @@ namespace TweenAnimator.Editor
                 {
                     if (e == dragged) continue;
                     if (e.delay < desiredDelay)
-                        prevEnd   = Mathf.Max(prevEnd,   e.EndTime);
+                        prevEnd = Mathf.Max(prevEnd, e.EndTime);
                     else
                         nextStart = Mathf.Min(nextStart, e.delay);
                 }
+
                 break;
             }
         }
@@ -935,7 +960,7 @@ namespace TweenAnimator.Editor
         {
             GUILayout.FlexibleSpace();
             GUILayout.BeginVertical(EditorStyles.helpBox);
-            
+
             GUILayout.Space(5);
 
             bool isMissing = _missingEntryIds.Contains(entry.entryId);
@@ -955,7 +980,7 @@ namespace TweenAnimator.Editor
             GUILayout.BeginHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Name", GUILayout.Width(40));
-            string defaultName   = BlockLabel(entry, ctrl.transform);
+            string defaultName = BlockLabel(entry, ctrl.transform);
             string displayedName = string.IsNullOrEmpty(entry.displayName) ? defaultName : entry.displayName;
             string newName = EditorGUILayout.DelayedTextField(displayedName, GUILayout.Width(200));
             if (newName != displayedName)
@@ -964,12 +989,14 @@ namespace TweenAnimator.Editor
                 entry.displayName = (newName == defaultName) ? string.Empty : newName;
                 EditorUtility.SetDirty(ctrl.Clip);
             }
+
             if (!string.IsNullOrEmpty(entry.displayName) && GUILayout.Button(new GUIContent("↺", "Reset name to default"), EditorStyles.miniButton, GUILayout.Width(20)))
             {
                 Undo.RecordObject(ctrl.Clip, "Reset Tween Entry Name");
                 entry.displayName = string.Empty;
                 EditorUtility.SetDirty(ctrl.Clip);
             }
+
             GUILayout.EndHorizontal();
 
             // Track color — applies to all entries sharing the same trackId
@@ -978,18 +1005,20 @@ namespace TweenAnimator.Editor
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Color", GUILayout.Width(40));
-                Color newTrackColor = EditorGUILayout.ColorField(entryTrack[0].trackColor,GUILayout.Width(200));
+                Color newTrackColor = EditorGUILayout.ColorField(entryTrack[0].trackColor, GUILayout.Width(200));
                 if (newTrackColor != entryTrack[0].trackColor)
                 {
                     Undo.RecordObject(ctrl.Clip, "Change Track Color");
                     foreach (var te in entryTrack) te.trackColor = newTrackColor;
                     EditorUtility.SetDirty(ctrl.Clip);
                 }
+
                 GUILayout.EndHorizontal();
             }
+
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-            
+
             EditorGUI.BeginChangeCheck();
             EditorGUI.BeginDisabledGroup(isMissing);
 
@@ -1009,17 +1038,17 @@ namespace TweenAnimator.Editor
             GUILayout.BeginHorizontal();
 
             GUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f));
-            entry.ease     = (DG.Tweening.Ease)    EditorGUILayout.EnumPopup ("Ease",       entry.ease);
-            entry.loopType = (DG.Tweening.LoopType) EditorGUILayout.EnumPopup("Loop Type",  entry.loopType);
-            entry.loops    = EditorGUILayout.IntField("Loops",  entry.loops);
-            entry.speed    = Mathf.Max(0.001f, EditorGUILayout.FloatField("Speed", entry.speed));
+            entry.ease = (DG.Tweening.Ease)EditorGUILayout.EnumPopup("Ease", entry.ease);
+            entry.loopType = (DG.Tweening.LoopType)EditorGUILayout.EnumPopup("Loop Type", entry.loopType);
+            entry.loops = EditorGUILayout.IntField("Loops", entry.loops);
+            entry.speed = Mathf.Max(0.001f, EditorGUILayout.FloatField("Speed", entry.speed));
             entry.useCurrentAsStart = EditorGUILayout.Toggle("Use Current As Start", entry.useCurrentAsStart);
 
             var desc = entry.binding != null
                 ? PropertyAccessorRegistry.GetDescriptor(entry.binding.componentTypeName, entry.binding.propertyName)
                 : null;
             if (desc != null && desc.ExtraParam == ExtraParamType.RotateMode)
-                entry.rotateMode = (DG.Tweening.RotateMode) EditorGUILayout.EnumPopup("Rotate Mode", entry.rotateMode);
+                entry.rotateMode = (DG.Tweening.RotateMode)EditorGUILayout.EnumPopup("Rotate Mode", entry.rotateMode);
 
             GUILayout.EndVertical();
 
@@ -1059,7 +1088,12 @@ namespace TweenAnimator.Editor
             string objName = ObjectName(entry.binding, root);
             string propDisplay = entry.binding.propertyName;
             foreach (var d in PropertyAccessorRegistry.GetSupportedProperties(entry.binding.componentTypeName))
-                if (d.PropertyName == entry.binding.propertyName) { propDisplay = d.DisplayName; break; }
+                if (d.PropertyName == entry.binding.propertyName)
+                {
+                    propDisplay = d.DisplayName;
+                    break;
+                }
+
             return $"{objName} - {propDisplay}";
         }
 
@@ -1089,6 +1123,7 @@ namespace TweenAnimator.Editor
                     entry.linkedStartEntryId = null;
                     EditorUtility.SetDirty(ctrl.Clip);
                 }
+
                 GUILayout.EndHorizontal();
             }
             else
@@ -1117,13 +1152,13 @@ namespace TweenAnimator.Editor
             switch (value.type)
             {
                 case PropertyType.Float:
-                    value.floatValue   = EditorGUILayout.FloatField(value.floatValue);                        break;
+                    value.floatValue = EditorGUILayout.FloatField(value.floatValue); break;
                 case PropertyType.Vector2:
-                    value.vector2Value = EditorGUILayout.Vector2Field(GUIContent.none, value.vector2Value);   break;
+                    value.vector2Value = EditorGUILayout.Vector2Field(GUIContent.none, value.vector2Value); break;
                 case PropertyType.Vector3:
-                    value.vector3Value = EditorGUILayout.Vector3Field(GUIContent.none, value.vector3Value);   break;
+                    value.vector3Value = EditorGUILayout.Vector3Field(GUIContent.none, value.vector3Value); break;
                 case PropertyType.Color:
-                    value.colorValue   = EditorGUILayout.ColorField(GUIContent.none, value.colorValue);       break;
+                    value.colorValue = EditorGUILayout.ColorField(GUIContent.none, value.colorValue); break;
             }
         }
 
@@ -1144,6 +1179,7 @@ namespace TweenAnimator.Editor
                     Repaint();
                 });
             }
+
             if (menu.GetItemCount() == 0)
                 menu.AddDisabledItem(new GUIContent("No compatible entries"));
             menu.ShowAsContext();
@@ -1154,13 +1190,13 @@ namespace TweenAnimator.Editor
             switch (value.type)
             {
                 case PropertyType.Float:
-                    value.floatValue   = EditorGUILayout.FloatField(label, value.floatValue);   break;
+                    value.floatValue = EditorGUILayout.FloatField(label, value.floatValue); break;
                 case PropertyType.Vector2:
                     value.vector2Value = EditorGUILayout.Vector2Field(label, value.vector2Value); break;
                 case PropertyType.Vector3:
                     value.vector3Value = EditorGUILayout.Vector3Field(label, value.vector3Value); break;
                 case PropertyType.Color:
-                    value.colorValue   = EditorGUILayout.ColorField(label, value.colorValue);    break;
+                    value.colorValue = EditorGUILayout.ColorField(label, value.colorValue); break;
             }
         }
 
@@ -1171,7 +1207,7 @@ namespace TweenAnimator.Editor
 
             var entry = new TweenEntryData
             {
-                binding    = binding,
+                binding = binding,
                 trackColor = PickTrackColor(seq),
             };
 
@@ -1181,7 +1217,7 @@ namespace TweenAnimator.Editor
                 if (d.PropertyName == binding.propertyName)
                 {
                     entry.startValue = PropertyValueUnion.DefaultForType(d.ValueType);
-                    entry.endValue   = PropertyValueUnion.DefaultForType(d.ValueType);
+                    entry.endValue = PropertyValueUnion.DefaultForType(d.ValueType);
                     break;
                 }
             }
@@ -1210,6 +1246,7 @@ namespace TweenAnimator.Editor
                     type = asm.GetType(entry.binding.componentTypeName);
                     if (type != null) break;
                 }
+
             if (type == null) return;
 
             var component = t.GetComponent(type);
@@ -1218,18 +1255,19 @@ namespace TweenAnimator.Editor
             Undo.RecordObject(ctrl.Clip, isStart ? "Capture Start" : "Capture End");
             var captured = accessor.ReadValue(component);
             if (isStart) entry.startValue = captured;
-            else         entry.endValue   = captured;
+            else entry.endValue = captured;
             EditorUtility.SetDirty(ctrl.Clip);
         }
 
         private static Color PickTrackColor(TweenSequenceData seq)
         {
             var tracks = GetTrackGroups(seq.entries);
-            var used   = new System.Collections.Generic.HashSet<Color>();
+            var used = new System.Collections.Generic.HashSet<Color>();
             foreach (var t in tracks)
                 used.Add(t[0].trackColor);
             foreach (var c in _palette)
-                if (!used.Contains(c)) return c;
+                if (!used.Contains(c))
+                    return c;
             return _palette[tracks.Count % _palette.Length];
         }
 
@@ -1254,8 +1292,8 @@ namespace TweenAnimator.Editor
             _blockStyle = new GUIStyle(GUI.skin.box)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize  = 10,
-                normal    = { textColor = Color.white }
+                fontSize = 10,
+                normal = { textColor = Color.white }
             };
 
             _labelStyle = new GUIStyle(EditorStyles.label) { fontSize = 11 };

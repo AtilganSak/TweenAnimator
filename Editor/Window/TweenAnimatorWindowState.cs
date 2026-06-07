@@ -5,20 +5,26 @@ using UnityEngine;
 
 namespace TweenAnimator.Editor
 {
-    public enum WindowMode { NoSelection, NoComponent, NoClip, HasController }
+    public enum WindowMode
+    {
+        NoSelection,
+        NoComponent,
+        NoClip,
+        HasController
+    }
 
     public class TweenAnimatorWindowState
     {
-        public WindowMode              Mode             { get; private set; } = WindowMode.NoSelection;
-        public TweenAnimatorController Controller       { get; private set; }
-        public TweenEntryData          SelectedEntry    { get; set; }
-        public float                   CurrentTime      { get; private set; }
-        public bool                    IsPreviewPlaying { get; private set; }
+        public WindowMode Mode { get; private set; } = WindowMode.NoSelection;
+        public TweenAnimatorController Controller { get; private set; }
+        public TweenEntryData SelectedEntry { get; set; }
+        public float CurrentTime { get; private set; }
+        public bool IsPreviewPlaying { get; private set; }
 
         private Dictionary<string, PropertyValueUnion> _snapshot;
         private Dictionary<string, PropertyValueUnion> _useCurrentStartCache = new Dictionary<string, PropertyValueUnion>();
-        private bool                                    _snapshotTaken;
-        private double                                  _lastEditorTime;
+        private bool _snapshotTaken;
+        private double _lastEditorTime;
 
         // ─── Preview mode ─────────────────────────────────────────────────────
 
@@ -36,8 +42,13 @@ namespace TweenAnimator.Editor
         public void ExitPreviewMode()
         {
             if (!IsPreviewEnabled) return;
-            if (IsPreviewPlaying) { EditorApplication.update -= OnEditorUpdate; IsPreviewPlaying = false; }
-            CurrentTime      = 0f;
+            if (IsPreviewPlaying)
+            {
+                EditorApplication.update -= OnEditorUpdate;
+                IsPreviewPlaying = false;
+            }
+
+            CurrentTime = 0f;
             _lastAppliedTime = -1f;
             _useCurrentStartCache.Clear();
             RestoreSnapshot();
@@ -51,17 +62,32 @@ namespace TweenAnimator.Editor
         public void Evaluate()
         {
             var go = Selection.activeGameObject;
-            if (go == null)                                        { Set(WindowMode.NoSelection, null); return; }
+            if (go == null)
+            {
+                Set(WindowMode.NoSelection, null);
+                return;
+            }
+
             var ctrl = go.GetComponentInParent<TweenAnimatorController>();
-            if (ctrl == null)                                      { Set(WindowMode.NoComponent, null); return; }
-            if (ctrl.Clip == null)                                 { Set(WindowMode.NoClip, ctrl);      return; }
+            if (ctrl == null)
+            {
+                Set(WindowMode.NoComponent, null);
+                return;
+            }
+
+            if (ctrl.Clip == null)
+            {
+                Set(WindowMode.NoClip, ctrl);
+                return;
+            }
+
             Set(WindowMode.HasController, ctrl);
         }
 
         private void Set(WindowMode mode, TweenAnimatorController ctrl)
         {
             if (mode != WindowMode.HasController) ExitPreviewMode();
-            Mode       = mode;
+            Mode = mode;
             Controller = ctrl;
             if (SelectedEntry != null && (Controller?.Sequence == null || !Controller.Sequence.entries.Contains(SelectedEntry)))
                 SelectedEntry = null;
@@ -98,7 +124,7 @@ namespace TweenAnimator.Editor
             {
                 if (!entry.isEnabled || entry.binding == null) continue;
 
-                var accessor  = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var accessor = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
                 var component = ResolveComponent(Controller, entry.binding);
                 if (accessor == null || component == null) continue;
 
@@ -117,8 +143,10 @@ namespace TweenAnimator.Editor
                         }
                         else
                             preStart = entry.startValue;
+
                         accessor.ApplyValue(component, preStart);
                     }
+
                     continue;
                 }
                 else if (entry.EffectiveDuration <= 0f || time >= entry.delay + entry.EffectiveDuration)
@@ -160,11 +188,12 @@ namespace TweenAnimator.Editor
             var r = new PropertyValueUnion { type = a.type };
             switch (a.type)
             {
-                case PropertyType.Float:   r.floatValue   = Mathf.Lerp(a.floatValue, b.floatValue, t);          break;
-                case PropertyType.Vector2: r.vector2Value = Vector2.Lerp(a.vector2Value, b.vector2Value, t);     break;
-                case PropertyType.Vector3: r.vector3Value = Vector3.Lerp(a.vector3Value, b.vector3Value, t);     break;
-                case PropertyType.Color:   r.colorValue   = Color.Lerp(a.colorValue, b.colorValue, t);           break;
+                case PropertyType.Float: r.floatValue = Mathf.Lerp(a.floatValue, b.floatValue, t); break;
+                case PropertyType.Vector2: r.vector2Value = Vector2.Lerp(a.vector2Value, b.vector2Value, t); break;
+                case PropertyType.Vector3: r.vector3Value = Vector3.Lerp(a.vector3Value, b.vector3Value, t); break;
+                case PropertyType.Color: r.colorValue = Color.Lerp(a.colorValue, b.colorValue, t); break;
             }
+
             return r;
         }
 
@@ -197,6 +226,7 @@ namespace TweenAnimator.Editor
                 EditorApplication.update -= OnEditorUpdate;
                 IsPreviewPlaying = false;
             }
+
             GotoTime(0f);
         }
 
@@ -217,11 +247,11 @@ namespace TweenAnimator.Editor
                 return;
             }
 
-            double now  = EditorApplication.timeSinceStartup;
+            double now = EditorApplication.timeSinceStartup;
             float delta = (float)(now - _lastEditorTime);
             _lastEditorTime = now;
 
-            float total   = Mathf.Max(0.001f, Controller.Sequence.TotalDuration);
+            float total = Mathf.Max(0.001f, Controller.Sequence.TotalDuration);
             float newTime = (CurrentTime + delta * Controller.Sequence.timeScale) % total;
             GotoTime(newTime);
         }
@@ -246,7 +276,7 @@ namespace TweenAnimator.Editor
                 string key = SnapshotKey(entry);
                 if (_snapshot.ContainsKey(key)) continue;
 
-                var accessor  = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var accessor = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
                 var component = ResolveComponent(Controller, entry.binding);
                 if (accessor != null && component != null)
                     _snapshot[key] = accessor.ReadValue(component);
@@ -263,13 +293,13 @@ namespace TweenAnimator.Editor
                 string key = SnapshotKey(entry);
                 if (!_snapshot.TryGetValue(key, out var saved)) continue;
 
-                var accessor  = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var accessor = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
                 var component = ResolveComponent(Controller, entry.binding);
                 if (accessor != null && component != null)
                     accessor.ApplyValue(component, saved);
             }
 
-            _snapshot      = null;
+            _snapshot = null;
             _snapshotTaken = false;
         }
 
@@ -290,6 +320,7 @@ namespace TweenAnimator.Editor
                     type = asm.GetType(binding.componentTypeName);
                     if (type != null) break;
                 }
+
             return type != null ? t.GetComponent(type) : null;
         }
     }
