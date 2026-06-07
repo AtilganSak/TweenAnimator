@@ -47,8 +47,12 @@ namespace TweenAnimator.Editor
         private float _dragStartDuration;
         private bool _scrubDragging;
         private float _dragAccumulatedY;
+        private Dictionary<TweenEntryData, float> _dragStartDelays = new Dictionary<TweenEntryData, float>();
         private List<List<TweenEntryData>> _cachedTracks = new List<List<TweenEntryData>>();
         private HashSet<string> _missingEntryIds = new HashSet<string>();
+
+        // Multi-selection
+        private HashSet<TweenEntryData> _selectedEntries = new HashSet<TweenEntryData>();
 
         // ─── Styles (lazy) ─────────────────────────────────────────────────────
         private static GUIStyle _blockStyle;
@@ -102,6 +106,7 @@ namespace TweenAnimator.Editor
         private void OnSelectionChanged()
         {
             _state.Evaluate();
+            _selectedEntries.Clear();
             ValidateBindings();
             Repaint();
         }
@@ -149,22 +154,26 @@ namespace TweenAnimator.Editor
                 return;
             }
 
-            // Keyboard shortcuts for selected entry
-            if (_state.SelectedEntry != null && _state.Controller?.Clip != null)
+            // Keyboard shortcuts for selected entries
+            if (_selectedEntries.Count > 0 && _state.Controller?.Clip != null)
             {
                 Event e = Event.current;
                 if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Delete)
                 {
-                    Undo.RecordObject(_state.Controller.Clip, "Remove Tween Entry");
-                    _state.Controller.Sequence.entries.Remove(_state.SelectedEntry);
-                    _state.SelectedEntry = null;
+                    Undo.RecordObject(_state.Controller.Clip, "Remove Tween Entries");
+                    foreach (var entry in _selectedEntries)
+                        _state.Controller.Sequence.entries.Remove(entry);
+                    ClearSelection();
                     EditorUtility.SetDirty(_state.Controller.Clip);
                     e.Use();
                     Repaint();
                 }
                 else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.D && e.control)
                 {
-                    DuplicateEntry(_state.Controller, _state.Controller.Sequence, _state.SelectedEntry);
+                    var sources = new List<TweenEntryData>(_selectedEntries);
+                    ClearSelection();
+                    foreach (var src in sources)
+                        AddToSelection(DuplicateEntry(_state.Controller, _state.Controller.Sequence, src));
                     e.Use();
                 }
             }
@@ -445,12 +454,12 @@ namespace TweenAnimator.Editor
 
             // Click on empty space below tracks → unselect
             Event evEmpty = Event.current;
-            if (evEmpty.type == EventType.MouseDown && evEmpty.button == 0)
+            if (evEmpty.type == EventType.MouseDown && evEmpty.button == 0 && !evEmpty.shift && !evEmpty.control)
             {
                 Rect fullArea = new Rect(0, HeaderHeight, position.width, availableHeight);
                 if (fullArea.Contains(evEmpty.mousePosition))
                 {
-                    _state.SelectedEntry = null;
+                    ClearSelection();
                     evEmpty.Use();
                     Repaint();
                 }
@@ -568,7 +577,7 @@ namespace TweenAnimator.Editor
 
         private void DrawTrackRow(List<TweenEntryData> track, int trackIndex, TweenAnimatorController ctrl, TweenSequenceData seq)
         {
-            bool anySelected = track.Contains(_state.SelectedEntry);
+            bool anySelected = track.Exists(e => _selectedEntries.Contains(e));
 
             GUILayout.BeginHorizontal(GUILayout.Height(TimelineHeight));
 
@@ -597,7 +606,10 @@ namespace TweenAnimator.Editor
             float warnWidth = trackMissing ? 18f : 0f;
             Rect textRect = new Rect(labelRect.x + 20, labelRect.y, labelRect.width - 58 - warnWidth, labelRect.height);
             if (GUI.Button(textRect, TrackLabel(firstEntry, ctrl.transform), EditorStyles.label))
-                _state.SelectedEntry = anySelected ? null : firstEntry;
+            {
+                if (anySelected) ClearSelection();
+                else SetSelection(firstEntry);
+            }
 
             if (trackMissing)
             {
@@ -619,7 +631,8 @@ namespace TweenAnimator.Editor
             {
                 Undo.RecordObject(ctrl.Clip, "Remove Track");
                 foreach (var te in track) seq.entries.Remove(te);
-                if (track.Contains(_state.SelectedEntry)) _state.SelectedEntry = null;
+                foreach (var te in track) _selectedEntries.Remove(te);
+                if (!_selectedEntries.Contains(_state.SelectedEntry)) _state.SelectedEntry = null;
                 EditorUtility.SetDirty(ctrl.Clip);
                 GUILayout.EndHorizontal();
                 return;
@@ -660,7 +673,7 @@ namespace TweenAnimator.Editor
 
         private void DrawBlock(TweenEntryData entry, Rect trackRect, TweenAnimatorController ctrl, TweenSequenceData seq, Color trackColor)
         {
-            bool isSelected = _state.SelectedEntry == entry;
+            bool isSelected = _selectedEntries.Contains(entry);
 
             float blockX = trackRect.x + (entry.delay - _timelineScrollX) * _pixelsPerSec;
             float blockW = Mathf.Max(MinBlockWidth, entry.EffectiveDuration * _pixelsPerSec);
@@ -698,13 +711,14 @@ namespace TweenAnimator.Editor
                 var menu = new GenericMenu();
                 var cap = entry;
                 menu.AddItem(new GUIContent("Duplicate"), false, () =>
-                    DuplicateEntry(ctrl, seq, cap));
+                    SetSelection(DuplicateEntry(ctrl, seq, cap)));
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Delete"), false, () =>
                 {
                     Undo.RecordObject(ctrl.Clip, "Remove Tween Entry");
                     seq.entries.Remove(cap);
-                    if (_state.SelectedEntry == cap) _state.SelectedEntry = null;
+                    _selectedEntries.Remove(cap);
+                    if (_state.SelectedEntry == cap) _state.SelectedEntry = _selectedEntries.Count > 0 ? _state.SelectedEntry : null;
                     EditorUtility.SetDirty(ctrl.Clip);
                     Repaint();
                 });
@@ -720,13 +734,27 @@ namespace TweenAnimator.Editor
                 Rect rightHandle = new Rect(blockRect.xMax - HandleWidth, blockRect.y, HandleWidth, blockRect.height);
 
                 if (leftHandle.Contains(e.mousePosition))
+                {
+                    SetSelection(entry);
                     BeginDrag(DragMode.ResizeLeft, entry);
+                }
                 else if (rightHandle.Contains(e.mousePosition))
+                {
+                    SetSelection(entry);
                     BeginDrag(DragMode.ResizeRight, entry);
+                }
                 else if (blockRect.Contains(e.mousePosition))
                 {
-                    _state.SelectedEntry = entry;
-                    BeginDrag(DragMode.MoveBlock, entry);
+                    if (e.shift)
+                        AddToSelection(entry);
+                    else if (e.control)
+                        ToggleSelection(entry);
+                    else
+                    {
+                        if (!isSelected)
+                            SetSelection(entry);
+                        BeginDrag(DragMode.MoveBlock, entry);
+                    }
                 }
             }
 
@@ -846,6 +874,9 @@ namespace TweenAnimator.Editor
             _dragStartDelay = entry.delay;
             _dragStartDuration = entry.EffectiveDuration;
             _dragAccumulatedY = 0f;
+            _dragStartDelays.Clear();
+            foreach (var sel in _selectedEntries)
+                _dragStartDelays[sel] = sel.delay;
             Event.current.Use();
         }
 
@@ -888,19 +919,65 @@ namespace TweenAnimator.Editor
                         FindTrackGap(_dragEntry, desiredDelay, dur, out float prevEnd, out float nextStart);
                         _dragEntry.delay = Mathf.Clamp(desiredDelay, prevEnd, Mathf.Max(prevEnd, nextStart - dur));
 
+                        // move all other selected entries by same delta
+                        float actualDelta = _dragEntry.delay - _dragStartDelay;
+                        foreach (var kvp in _dragStartDelays)
+                        {
+                            if (kvp.Key == _dragEntry) continue;
+                            kvp.Key.delay = Mathf.Max(0f, SnapValue(kvp.Value + actualDelta, e.control));
+                        }
+
                         _dragAccumulatedY += e.delta.y;
                         if (Mathf.Abs(_dragAccumulatedY) >= TimelineHeight)
                         {
                             int dir = _dragAccumulatedY > 0f ? 1 : -1;
-                            int currentIdx = _cachedTracks.FindIndex(t => t.Contains(_dragEntry));
-                            if (currentIdx >= 0)
+                            int primaryIdx = _cachedTracks.FindIndex(t => t.Contains(_dragEntry));
+                            if (primaryIdx >= 0)
                             {
-                                int targetIdx = currentIdx + dir;
-                                string newTrackId = (targetIdx < 0 || targetIdx >= _cachedTracks.Count)
-                                    ? System.Guid.NewGuid().ToString()
-                                    : _cachedTracks[targetIdx][0].trackId;
+                                var seqEntries = _state.Controller.Sequence.entries;
+                                var moves = new List<(TweenEntryData entry, string newTrackId, int tgtIdx)>();
+                                foreach (var sel in _selectedEntries)
+                                {
+                                    int curIdx = _cachedTracks.FindIndex(t => t.Contains(sel));
+                                    if (curIdx < 0) continue;
+                                    int tgtIdx = curIdx + dir;
+                                    string newId = (tgtIdx < 0 || tgtIdx >= _cachedTracks.Count)
+                                        ? System.Guid.NewGuid().ToString()
+                                        : _cachedTracks[tgtIdx][0].trackId;
+                                    moves.Add((sel, newId, tgtIdx));
+                                }
 
-                                _dragEntry.trackId = newTrackId;
+                                foreach (var (sel, newId, tgtIdx) in moves)
+                                {
+                                    sel.trackId = newId;
+                                    seqEntries.Remove(sel);
+                                    if (tgtIdx < 0)
+                                    {
+                                        seqEntries.Insert(0, sel);
+                                    }
+                                    else if (tgtIdx >= _cachedTracks.Count)
+                                    {
+                                        seqEntries.Add(sel);
+                                    }
+                                    else
+                                    {
+                                        // Insert after last entry of target track so visual row order is preserved
+                                        var targetTrack = _cachedTracks[tgtIdx];
+                                        int insertAt = seqEntries.Count;
+                                        for (int ei = seqEntries.Count - 1; ei >= 0; ei--)
+                                        {
+                                            if (targetTrack.Contains(seqEntries[ei]))
+                                            {
+                                                insertAt = ei + 1;
+                                                break;
+                                            }
+                                        }
+
+                                        seqEntries.Insert(insertAt, sel);
+                                    }
+                                }
+
+                                _cachedTracks = GetTrackGroups(seqEntries);
                                 _dragAccumulatedY -= dir * TimelineHeight;
                             }
                         }
@@ -953,6 +1030,7 @@ namespace TweenAnimator.Editor
                 foreach (var e in track)
                 {
                     if (e == dragged) continue;
+                    if (_selectedEntries.Contains(e)) continue; // co-selected entries move together — ignore for gap
                     if (e.delay < desiredDelay)
                         prevEnd = Mathf.Max(prevEnd, e.EndTime);
                     else
@@ -1208,8 +1286,46 @@ namespace TweenAnimator.Editor
             }
         }
 
+        // ─── Selection helpers ────────────────────────────────────────────────
+        private bool IsSelected(TweenEntryData e) => _selectedEntries.Contains(e);
+
+        private void SetSelection(TweenEntryData e)
+        {
+            _selectedEntries.Clear();
+            if (e != null) _selectedEntries.Add(e);
+            _state.SelectedEntry = e;
+        }
+
+        private void AddToSelection(TweenEntryData e)
+        {
+            if (e == null) return;
+            _selectedEntries.Add(e);
+            _state.SelectedEntry = e;
+        }
+
+        private void ToggleSelection(TweenEntryData e)
+        {
+            if (e == null) return;
+            if (_selectedEntries.Contains(e))
+            {
+                _selectedEntries.Remove(e);
+                _state.SelectedEntry = _selectedEntries.Count > 0 ? _state.SelectedEntry : null;
+            }
+            else
+            {
+                _selectedEntries.Add(e);
+                _state.SelectedEntry = e;
+            }
+        }
+
+        private void ClearSelection()
+        {
+            _selectedEntries.Clear();
+            _state.SelectedEntry = null;
+        }
+
         // ─── Actions ───────────────────────────────────────────────────────────
-        private void DuplicateEntry(TweenAnimatorController ctrl, TweenSequenceData seq, TweenEntryData source)
+        private TweenEntryData DuplicateEntry(TweenAnimatorController ctrl, TweenSequenceData seq, TweenEntryData source)
         {
             Undo.RecordObject(ctrl.Clip, "Duplicate Tween Entry");
 
@@ -1243,9 +1359,9 @@ namespace TweenAnimator.Editor
             };
 
             seq.entries.Add(copy);
-            _state.SelectedEntry = copy;
             EditorUtility.SetDirty(ctrl.Clip);
             Repaint();
+            return copy;
         }
 
         private void AddEntry(TweenAnimatorController ctrl, TweenSequenceData seq, TweenPropertyBinding binding)
