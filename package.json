@@ -1,6 +1,6 @@
 {
   "name": "com.heatinteractive.tweenanimator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Tween Animator",
   "description": "Visual timeline-based tween animation editor for Unity, powered by DOTween. Design multi-property animations with a custom editor window, scrub-preview in Edit Mode, and play them back at runtime with a single API call.",
   "unity": "2021.3",
