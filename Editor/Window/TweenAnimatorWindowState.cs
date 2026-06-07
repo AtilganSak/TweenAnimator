@@ -20,6 +20,8 @@ namespace TweenAnimator.Editor
         public TweenEntryData SelectedEntry { get; set; }
         public float CurrentTime { get; private set; }
         public bool IsPreviewPlaying { get; private set; }
+        public float PreviewSpeed { get; set; } = 1f;
+        public bool PreviewLoop { get; set; } = true;
 
         private Dictionary<string, PropertyValueUnion> _snapshot;
         private Dictionary<string, PropertyValueUnion> _useCurrentStartCache = new Dictionary<string, PropertyValueUnion>();
@@ -252,7 +254,19 @@ namespace TweenAnimator.Editor
             _lastEditorTime = now;
 
             float total = Mathf.Max(0.001f, Controller.Sequence.TotalDuration);
-            float newTime = (CurrentTime + delta * Controller.Sequence.timeScale) % total;
+            float newTime = CurrentTime + delta * Controller.Sequence.timeScale * PreviewSpeed;
+            if (newTime >= total)
+            {
+                if (PreviewLoop)
+                    newTime %= total;
+                else
+                {
+                    GotoTime(total);
+                    PausePreview();
+                    return;
+                }
+            }
+
             GotoTime(newTime);
         }
 

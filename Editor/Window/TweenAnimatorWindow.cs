@@ -349,24 +349,60 @@ namespace TweenAnimator.Editor
 
             EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
 
-            if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("PlayButton").image, "Play preview"), EditorStyles.toolbarButton, GUILayout.Width(30)))
+            bool playToggle = GUILayout.Toggle(
+                _state.IsPreviewPlaying,
+                new GUIContent(EditorGUIUtility.IconContent("PlayButton").image, "Play preview"),
+                EditorStyles.toolbarButton, GUILayout.Width(30));
+            if (playToggle != _state.IsPreviewPlaying)
             {
-                if (!_state.IsPreviewEnabled) _state.EnterPreviewMode();
-                _state.StartPreview();
+                if (playToggle)
+                {
+                    if (!_state.IsPreviewEnabled) _state.EnterPreviewMode();
+                    _state.StartPreview();
+                }
+                else _state.PausePreview();
             }
 
-            if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("PauseButton").image, "Pause preview"), EditorStyles.toolbarButton, GUILayout.Width(30)))
-                _state.PausePreview();
+            bool pauseToggle = GUILayout.Toggle(
+                _state.IsPreviewEnabled && !_state.IsPreviewPlaying,
+                new GUIContent(EditorGUIUtility.IconContent("PauseButton").image, "Pause preview"),
+                EditorStyles.toolbarButton, GUILayout.Width(30));
+            if (pauseToggle != (_state.IsPreviewEnabled && !_state.IsPreviewPlaying))
+            {
+                if (pauseToggle) _state.PausePreview();
+                else _state.StartPreview();
+            }
 
             if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("PreMatQuad").image, "Stop preview"), EditorStyles.toolbarButton, GUILayout.Width(30)))
+            {
                 _state.StopPreview();
+                ClearSelection();
+            }
 
             if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("Animation.FirstKey").image, "Rewind to start"), EditorStyles.toolbarButton, GUILayout.Width(30)))
                 _state.RewindPreview();
 
+            GUILayout.Space(2);
+
+            _state.PreviewLoop = GUILayout.Toggle(
+                _state.PreviewLoop,
+                new GUIContent(EditorGUIUtility.IconContent("RotateTool").image, "Loop preview"),
+                EditorStyles.toolbarButton,
+                GUILayout.Width(30));
+
             EditorGUI.EndDisabledGroup();
 
-            GUILayout.Space(10);
+            GUILayout.Space(6);
+
+            EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
+            GUILayout.Label("Speed", EditorStyles.miniLabel, GUILayout.Width(36));
+            float newSpeed = GUILayout.HorizontalSlider(_state.PreviewSpeed, 0.25f, 2f, GUILayout.Width(70));
+            if (!Mathf.Approximately(newSpeed, _state.PreviewSpeed))
+                _state.PreviewSpeed = newSpeed;
+            GUILayout.Label($"{_state.PreviewSpeed:F2}x", EditorStyles.miniLabel, GUILayout.Width(34));
+            EditorGUI.EndDisabledGroup();
+
+            GUILayout.Space(4);
 
             if (GUILayout.Button(new GUIContent("⟲ View", "Reset timeline zoom and scroll"), EditorStyles.toolbarButton, GUILayout.Width(48)))
             {
