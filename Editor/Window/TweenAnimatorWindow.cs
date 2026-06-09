@@ -761,17 +761,23 @@ namespace TweenAnimator.Editor
                 "Event Markers", EditorStyles.miniLabel);
 
             Rect addRect = new Rect(labelRect.xMax - 18, labelRect.y + 1, 18, 16);
-            if (GUI.Button(addRect, new GUIContent("+", "Add marker at playhead"), EditorStyles.miniButton))
+            EditorGUI.BeginDisabledGroup(!_state.IsPreviewEnabled);
+            if (GUI.Button(addRect, new GUIContent("+", "Add marker at playhead (enter Preview mode first)"), EditorStyles.miniButton))
             {
-                Undo.RecordObject(ctrl.Clip, "Add Event Marker");
-                var m = new EventMarkerData { time = SnapValue(Mathf.Max(0f, _state.CurrentTime)) };
-                seq.markers.Add(m);
-                EditorUtility.SetDirty(ctrl.Clip);
-                _renamingMarkerId = m.markerId;
-                _renamingMarkerName = m.displayName;
-                _focusMarkerRename = true;
-                Repaint();
+                float newMarkerTime = SnapValue(Mathf.Max(0f, _state.CurrentTime));
+                if (!seq.markers.Exists(m => Mathf.Approximately(m.time, newMarkerTime)))
+                {
+                    Undo.RecordObject(ctrl.Clip, "Add Event Marker");
+                    var m = new EventMarkerData { time = newMarkerTime };
+                    seq.markers.Add(m);
+                    EditorUtility.SetDirty(ctrl.Clip);
+                    _renamingMarkerId = m.markerId;
+                    _renamingMarkerName = m.displayName;
+                    _focusMarkerRename = true;
+                    Repaint();
+                }
             }
+            EditorGUI.EndDisabledGroup();
 
             Rect trackRect = GUILayoutUtility.GetRect(
                 position.width - LabelWidth, MarkerTrackHeight,
