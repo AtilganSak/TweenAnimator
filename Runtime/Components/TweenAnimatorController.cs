@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.Events;
@@ -208,6 +210,33 @@ namespace TweenAnimator
             _builtSequence = Build();
             _builtSequence.Play();
             FirePlay();
+        }
+
+        /// <summary>Play and return a Task that completes when the sequence finishes.</summary>
+        public Task PlayAsync(CancellationToken cancellationToken = default)
+        {
+            if (Sequence == null) return Task.CompletedTask;
+
+            var tcs = new TaskCompletionSource<bool>();
+
+            void OnDone()
+            {
+                OnComplete -= OnDone;
+                tcs.TrySetResult(true);
+            }
+
+            OnComplete += OnDone;
+            Play();
+
+            if (cancellationToken.CanBeCanceled)
+                cancellationToken.Register(() =>
+                {
+                    OnComplete -= OnDone;
+                    Stop();
+                    tcs.TrySetCanceled(cancellationToken);
+                });
+
+            return tcs.Task;
         }
 
         /// <summary>Assign a new clip then play it from the beginning.</summary>
