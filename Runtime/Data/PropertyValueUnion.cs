@@ -8,7 +8,7 @@ namespace TweenAnimator
         Float,
         Vector2,
         Vector3,
-        Color
+        Color,
     }
 
     public enum PropertyAxis

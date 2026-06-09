@@ -196,4 +196,81 @@ namespace TweenAnimator
         public override PropertyValueUnion ReadValue(Component target) =>
             PropertyValueUnion.FromColor(_getter(target));
     }
+
+    // Property name convention: "mat_float:<shaderProp>" or "mat_color:<shaderProp>"
+    public sealed class MaterialFloatPropertyAccessor : PropertyAccessor
+    {
+        private readonly string _shaderProp;
+
+        public MaterialFloatPropertyAccessor(string shaderProp) { _shaderProp = shaderProp; }
+
+        private Material Mat(Component target)
+        {
+            var r = (Renderer)target;
+            return Application.isPlaying ? r.material : r.sharedMaterial;
+        }
+
+        public override Tween BuildTween(Component target, TweenEntryData entry)
+        {
+            var mat = Mat(target);
+            float end = entry.endValue.floatValue;
+            return DOTween.To(() => mat.GetFloat(_shaderProp), v => mat.SetFloat(_shaderProp, v), end, entry.EffectiveDuration)
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
+        }
+
+        public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
+        {
+            var mat = Mat(target);
+            float start = from.floatValue;
+            float end = entry.endValue.floatValue;
+            return DOTween.To(() => start, v => mat.SetFloat(_shaderProp, v), end, entry.EffectiveDuration)
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
+        }
+
+        public override void ApplyValue(Component target, PropertyValueUnion value) =>
+            Mat(target).SetFloat(_shaderProp, value.floatValue);
+
+        public override PropertyValueUnion ReadValue(Component target) =>
+            PropertyValueUnion.FromFloat(Mat(target).GetFloat(_shaderProp));
+    }
+
+    public sealed class MaterialColorPropertyAccessor : PropertyAccessor
+    {
+        private readonly string _shaderProp;
+
+        public MaterialColorPropertyAccessor(string shaderProp) { _shaderProp = shaderProp; }
+
+        private Material Mat(Component target)
+        {
+            var r = (Renderer)target;
+            return Application.isPlaying ? r.material : r.sharedMaterial;
+        }
+
+        public override Tween BuildTween(Component target, TweenEntryData entry)
+        {
+            var mat = Mat(target);
+            Color end = entry.endValue.colorValue;
+            return DOTween.To(() => mat.GetColor(_shaderProp), v => mat.SetColor(_shaderProp, v), end, entry.EffectiveDuration)
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
+        }
+
+        public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
+        {
+            var mat = Mat(target);
+            Color start = from.colorValue;
+            Color end = entry.endValue.colorValue;
+            return DOTween.To(() => start, v => mat.SetColor(_shaderProp, v), end, entry.EffectiveDuration)
+                .SetEase(entry.ease)
+                .SetLoops(entry.loops, entry.loopType);
+        }
+
+        public override void ApplyValue(Component target, PropertyValueUnion value) =>
+            Mat(target).SetColor(_shaderProp, value.colorValue);
+
+        public override PropertyValueUnion ReadValue(Component target) =>
+            PropertyValueUnion.FromColor(Mat(target).GetColor(_shaderProp));
+    }
 }

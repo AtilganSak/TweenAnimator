@@ -48,10 +48,48 @@ namespace TweenAnimator.Editor
                         OwnerObject = current.gameObject
                     });
                 }
+
+                if (component is Renderer renderer)
+                    ScanMaterialProperties(renderer, path, typeName, results);
             }
 
             foreach (Transform child in current)
                 ScanRecursive(root, child, results);
+        }
+
+        private static void ScanMaterialProperties(Renderer renderer, string path, string typeName, List<DiscoveredProperty> results)
+        {
+            if (renderer.sharedMaterial == null) return;
+            var shader = renderer.sharedMaterial.shader;
+            int count = ShaderUtil.GetPropertyCount(shader);
+            for (int i = 0; i < count; i++)
+            {
+                if (ShaderUtil.IsShaderPropertyHidden(shader, i)) continue;
+                var shaderPropType = ShaderUtil.GetPropertyType(shader, i);
+                string shaderPropName = ShaderUtil.GetPropertyName(shader, i);
+                string shaderPropDesc = ShaderUtil.GetPropertyDescription(shader, i);
+
+                string propName;
+                PropertyType valueType;
+
+                if (shaderPropType == ShaderUtil.ShaderPropertyType.Color)
+                {
+                    propName = "mat_color:" + shaderPropName;
+                    valueType = PropertyType.Color;
+                }
+                else continue;
+
+                results.Add(new DiscoveredProperty
+                {
+                    HierarchyPath = path,
+                    ComponentTypeName = typeName,
+                    ComponentShortName = renderer.GetType().Name,
+                    PropertyName = propName,
+                    DisplayName = "Material / " + shaderPropDesc,
+                    ValueType = valueType,
+                    OwnerObject = renderer.gameObject
+                });
+            }
         }
     }
 }

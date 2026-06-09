@@ -1406,12 +1406,12 @@ namespace TweenAnimator.Editor
 
             GUILayout.BeginVertical();
             EditorGUI.BeginDisabledGroup(entry.useCurrentAsStart);
-            DrawStartValueField(entry, ctrl);
+            DrawStartValueField(entry, ctrl, desc);
             EditorGUI.EndDisabledGroup();
             GUILayout.BeginHorizontal();
             DrawCaptureButton(ctrl, entry, isStart: false);
             GUILayout.Label("End", GUILayout.Width(35));
-            DrawValueFieldNoLabel(ref entry.endValue);
+            DrawValueFieldNoLabel(ref entry.endValue, desc);
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
 
@@ -1438,13 +1438,8 @@ namespace TweenAnimator.Editor
             if (!string.IsNullOrEmpty(entry.displayName)) return entry.displayName;
             if (entry.binding == null) return "?";
             string objName = ObjectName(entry.binding, root);
-            string propDisplay = entry.binding.propertyName;
-            foreach (var d in PropertyAccessorRegistry.GetSupportedProperties(entry.binding.componentTypeName))
-                if (d.PropertyName == entry.binding.propertyName)
-                {
-                    propDisplay = d.DisplayName;
-                    break;
-                }
+            var blockDesc = PropertyAccessorRegistry.GetDescriptor(entry.binding.componentTypeName, entry.binding.propertyName);
+            string propDisplay = blockDesc?.DisplayName ?? entry.binding.propertyName;
 
             return $"{objName} - {propDisplay}";
         }
@@ -1457,7 +1452,7 @@ namespace TweenAnimator.Editor
             return slash >= 0 ? binding.hierarchyPath.Substring(slash + 1) : binding.hierarchyPath;
         }
 
-        private void DrawStartValueField(TweenEntryData entry, TweenAnimatorController ctrl)
+        private void DrawStartValueField(TweenEntryData entry, TweenAnimatorController ctrl, PropertyDescriptor desc = null)
         {
             if (!string.IsNullOrEmpty(entry.linkedStartEntryId))
             {
@@ -1483,7 +1478,7 @@ namespace TweenAnimator.Editor
                 GUILayout.BeginHorizontal();
                 DrawCaptureButton(ctrl, entry, isStart: true);
                 GUILayout.Label("Start", GUILayout.Width(35));
-                DrawValueFieldNoLabel(ref entry.startValue);
+                DrawValueFieldNoLabel(ref entry.startValue, desc);
                 if (GUILayout.Button(new GUIContent("🔗", "Link start value to another entry's end value"), EditorStyles.miniButton, GUILayout.Width(24)))
                     ShowLinkMenu(ctrl, entry);
                 GUILayout.EndHorizontal();
@@ -1499,7 +1494,7 @@ namespace TweenAnimator.Editor
             GUI.backgroundColor = prev;
         }
 
-        private static void DrawValueFieldNoLabel(ref PropertyValueUnion value)
+        private static void DrawValueFieldNoLabel(ref PropertyValueUnion value, PropertyDescriptor desc = null)
         {
             switch (value.type)
             {
@@ -1640,18 +1635,15 @@ namespace TweenAnimator.Editor
                 trackColor = PickTrackColor(seq),
             };
 
-            var descriptors = PropertyAccessorRegistry.GetSupportedProperties(binding.componentTypeName);
-            foreach (var d in descriptors)
+            var entryDesc = PropertyAccessorRegistry.GetDescriptor(binding.componentTypeName, binding.propertyName);
+            if (entryDesc != null)
             {
-                if (d.PropertyName == binding.propertyName)
-                {
-                    entry.startValue = PropertyValueUnion.DefaultForType(d.ValueType);
-                    entry.endValue = PropertyValueUnion.DefaultForType(d.ValueType);
-                    break;
-                }
+                entry.startValue = PropertyValueUnion.DefaultForType(entryDesc.ValueType);
+                entry.endValue = PropertyValueUnion.DefaultForType(entryDesc.ValueType);
             }
 
             seq.entries.Add(entry);
+            CaptureValue(ctrl, entry, isStart: true);
             _state.SelectedEntry = entry;
             EditorUtility.SetDirty(ctrl.Clip);
         }

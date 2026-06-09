@@ -164,10 +164,20 @@ namespace TweenAnimator
 
         public static PropertyDescriptor GetDescriptor(string componentTypeName, string propertyName)
         {
-            if (!_byType.TryGetValue(componentTypeName, out var list)) return null;
-            foreach (var d in list)
-                if (d.PropertyName == propertyName)
-                    return d;
+            if (_byType.TryGetValue(componentTypeName, out var list))
+                foreach (var d in list)
+                    if (d.PropertyName == propertyName)
+                        return d;
+
+            return BuildMaterialDescriptor(propertyName);
+        }
+
+        private static PropertyDescriptor BuildMaterialDescriptor(string propertyName)
+        {
+            if (propertyName.StartsWith("mat_float:"))
+                return new PropertyDescriptor { PropertyName = propertyName, DisplayName = "Material / " + propertyName.Substring(10), ValueType = PropertyType.Float };
+            if (propertyName.StartsWith("mat_color:"))
+                return new PropertyDescriptor { PropertyName = propertyName, DisplayName = "Material / " + propertyName.Substring(10), ValueType = PropertyType.Color };
             return null;
         }
 
@@ -184,9 +194,15 @@ namespace TweenAnimator
 
         public static PropertyAccessor Get(string componentTypeName, string propertyName)
         {
-            return _factories.TryGetValue((componentTypeName, propertyName), out var factory)
-                ? factory()
-                : null;
+            if (_factories.TryGetValue((componentTypeName, propertyName), out var factory))
+                return factory();
+
+            if (propertyName.StartsWith("mat_float:"))
+                return new MaterialFloatPropertyAccessor(propertyName.Substring(10));
+            if (propertyName.StartsWith("mat_color:"))
+                return new MaterialColorPropertyAccessor(propertyName.Substring(10));
+
+            return null;
         }
 
         public static IReadOnlyList<PropertyDescriptor> GetSupportedProperties(string componentTypeName)
