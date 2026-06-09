@@ -122,43 +122,48 @@ namespace TweenAnimator.Editor
                 _useCurrentStartCache.Clear();
             _lastAppliedTime = time;
 
+            // Pass 1: apply pre-tween start values for entries that haven't started yet.
+            // Pass 2 (active/completed entries) will overwrite these, so sequential tweens
+            // on the same property don't clobber each other's animated values.
             foreach (var entry in Controller.Sequence.entries)
             {
                 if (!entry.isEnabled || entry.binding == null) continue;
+                if (time >= entry.delay) continue;
+
+                _useCurrentStartCache.Remove(entry.entryId);
+                if (entry.useCurrentAsStart) continue;
+
+                var accessor = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
+                var component = ResolveComponent(Controller, entry.binding);
+                if (accessor == null || component == null) continue;
+
+                PropertyValueUnion preStart;
+                if (!string.IsNullOrEmpty(entry.linkedStartEntryId))
+                {
+                    var linked = Controller.Sequence.entries.Find(e => e.entryId == entry.linkedStartEntryId);
+                    preStart = linked != null ? linked.endValue : entry.startValue;
+                }
+                else
+                    preStart = entry.startValue;
+
+                accessor.ApplyValue(component, preStart);
+            }
+
+            // Pass 2: apply interpolated values for active and completed entries.
+            foreach (var entry in Controller.Sequence.entries)
+            {
+                if (!entry.isEnabled || entry.binding == null) continue;
+                if (time < entry.delay) continue;
 
                 var accessor = PropertyAccessorRegistry.Get(entry.binding.componentTypeName, entry.binding.propertyName);
                 var component = ResolveComponent(Controller, entry.binding);
                 if (accessor == null || component == null) continue;
 
                 float localT;
-                if (time < entry.delay)
-                {
-                    // Entry not started yet — apply start value so the object sits at its pre-tween state.
-                    _useCurrentStartCache.Remove(entry.entryId);
-                    if (!entry.useCurrentAsStart)
-                    {
-                        PropertyValueUnion preStart;
-                        if (!string.IsNullOrEmpty(entry.linkedStartEntryId))
-                        {
-                            var linked = Controller.Sequence.entries.Find(e => e.entryId == entry.linkedStartEntryId);
-                            preStart = linked != null ? linked.endValue : entry.startValue;
-                        }
-                        else
-                            preStart = entry.startValue;
-
-                        accessor.ApplyValue(component, preStart);
-                    }
-
-                    continue;
-                }
-                else if (entry.EffectiveDuration <= 0f || time >= entry.delay + entry.EffectiveDuration)
-                {
+                if (entry.EffectiveDuration <= 0f || time >= entry.delay + entry.EffectiveDuration)
                     localT = 1f;
-                }
                 else
-                {
                     localT = (time - entry.delay) / entry.EffectiveDuration;
-                }
 
                 float easedT = DOVirtual.EasedValue(0f, 1f, localT, entry.ease);
 
