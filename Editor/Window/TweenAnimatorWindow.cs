@@ -1396,7 +1396,18 @@ namespace TweenAnimator.Editor
             GUILayout.BeginHorizontal();
 
             GUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f));
-            entry.ease = (DG.Tweening.Ease)EditorGUILayout.EnumPopup("Ease", entry.ease);
+            entry.useCustomCurve = EditorGUILayout.Toggle("Custom Curve", entry.useCustomCurve);
+            if (entry.useCustomCurve)
+            {
+                if (entry.customEaseCurve == null)
+                    entry.customEaseCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+                entry.customEaseCurve = EditorGUILayout.CurveField("Ease Curve",
+                    entry.customEaseCurve, Color.cyan, new Rect(0, 0, 1f, 1f));
+            }
+            else
+            {
+                entry.ease = (DG.Tweening.Ease)EditorGUILayout.EnumPopup("Ease", entry.ease);
+            }
             entry.loopType = (DG.Tweening.LoopType)EditorGUILayout.EnumPopup("Loop Type", entry.loopType);
             entry.loops = EditorGUILayout.IntField("Loops", entry.loops);
             entry.speed = Mathf.Max(0.001f, EditorGUILayout.FloatField("Speed", entry.speed));
@@ -1619,6 +1630,10 @@ namespace TweenAnimator.Editor
                 duration = source.duration,
                 speed = source.speed,
                 ease = source.ease,
+                useCustomCurve = source.useCustomCurve,
+                customEaseCurve = source.customEaseCurve != null
+                    ? new AnimationCurve(source.customEaseCurve.keys)
+                    : AnimationCurve.Linear(0, 0, 1, 1),
                 loopType = source.loopType,
                 loops = source.loops,
                 rotateMode = source.rotateMode,

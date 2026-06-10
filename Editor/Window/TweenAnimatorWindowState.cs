@@ -165,7 +165,9 @@ namespace TweenAnimator.Editor
                 else
                     localT = (time - entry.delay) / entry.EffectiveDuration;
 
-                float easedT = DOVirtual.EasedValue(0f, 1f, localT, entry.ease);
+                float easedT = entry.useCustomCurve && entry.customEaseCurve != null
+                    ? (localT <= 0f ? 0f : localT >= 1f ? 1f : entry.customEaseCurve.Evaluate(localT))
+                    : DOVirtual.EasedValue(0f, 1f, localT, entry.ease);
 
                 PropertyValueUnion from;
                 if (entry.useCurrentAsStart)

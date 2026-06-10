@@ -31,6 +31,7 @@ namespace TweenAnimator.Editor
             public float StartVal;
             public float EndVal;
             public Ease Ease;
+            public AnimationCurve CustomCurve; // non-null when useCustomCurve
             public int Loops;
             public LoopType LoopType;
         }
@@ -195,8 +196,9 @@ namespace TweenAnimator.Editor
                         EndTime   = entry.delay + singleDuration * effectiveLoops,
                         StartVal  = startCh[ci],
                         EndVal    = endCh[ci],
-                        Ease      = entry.ease,
-                        Loops     = effectiveLoops,
+                        Ease        = entry.ease,
+                        CustomCurve = entry.useCustomCurve ? entry.customEaseCurve : null,
+                        Loops       = effectiveLoops,
                         LoopType  = entry.loopType,
                     });
                 }
@@ -251,7 +253,9 @@ namespace TweenAnimator.Editor
                     for (int s = 0; s <= spl; s++)
                     {
                         float nt    = (float)s / spl;
-                        float eased = EaseManager.Evaluate(seg.Ease, null, nt * singleDur, singleDur, 1.70158f, 0f);
+                        float eased = seg.CustomCurve != null
+                            ? seg.CustomCurve.Evaluate(nt)
+                            : EaseManager.Evaluate(seg.Ease, null, nt * singleDur, singleDur, 1.70158f, 0f);
                         loopKeys.Add(new Keyframe(loopStart + nt * singleDur,
                                                   Mathf.LerpUnclamped(fromVal, toVal, eased)));
                     }

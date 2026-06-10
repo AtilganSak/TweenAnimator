@@ -10,6 +10,48 @@ namespace TweenAnimator
         public abstract Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from);
         public abstract void ApplyValue(Component target, PropertyValueUnion value);
         public abstract PropertyValueUnion ReadValue(Component target);
+
+        protected static Tween ApplyEase(Tween tw, TweenEntryData entry)
+        {
+            if (entry.useCustomCurve && entry.customEaseCurve != null)
+            {
+                var curve = FixEndpointTangents(entry.customEaseCurve);
+                return tw.SetEase((time, duration, overshoot, period) =>
+                {
+                    if (duration <= 0f) return 1f;
+                    float t = time / duration;
+                    if (t <= 0f) return 0f;
+                    if (t >= 1f) return 1f;
+                    return curve.Evaluate(t);
+                });
+            }
+            return tw.SetEase(entry.ease);
+        }
+
+        // Returns a copy of the curve with endpoint tangents clamped to ≥ 0.
+        // Unity auto-smooth can give the first key a negative outTangent, causing the
+        // curve to dip below 0 on the very first frames and producing a visible position
+        // overshoot opposite to the intended direction.
+        // A runtime copy is made so the user's saved curve data is never modified.
+        private static AnimationCurve FixEndpointTangents(AnimationCurve src)
+        {
+            if (src.length == 0) return src;
+            var keys = src.keys; // already a copy
+
+            bool dirty = false;
+
+            var first = keys[0];
+            if (first.outTangent < 0f) { first.outTangent = 0f; keys[0] = first; dirty = true; }
+
+            if (keys.Length > 1)
+            {
+                int last = keys.Length - 1;
+                var lastKey = keys[last];
+                if (lastKey.inTangent < 0f) { lastKey.inTangent = 0f; keys[last] = lastKey; dirty = true; }
+            }
+
+            return dirty ? new AnimationCurve(keys) : src;
+        }
     }
 
     public sealed class Vector3PropertyAccessor : PropertyAccessor
@@ -26,8 +68,7 @@ namespace TweenAnimator
         public override Tween BuildTween(Component target, TweenEntryData entry)
         {
             Vector3 end = entry.endValue.vector3Value;
-            return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -35,8 +76,7 @@ namespace TweenAnimator
         {
             Vector3 start = from.vector3Value;
             Vector3 end = entry.endValue.vector3Value;
-            return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -61,8 +101,7 @@ namespace TweenAnimator
         public override Tween BuildTween(Component target, TweenEntryData entry)
         {
             float end = entry.endValue.floatValue;
-            return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -70,8 +109,7 @@ namespace TweenAnimator
         {
             float start = from.floatValue;
             float end = entry.endValue.floatValue;
-            return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -96,8 +134,7 @@ namespace TweenAnimator
         public override Tween BuildTween(Component target, TweenEntryData entry)
         {
             Vector2 end = entry.endValue.vector2Value;
-            return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -105,8 +142,7 @@ namespace TweenAnimator
         {
             Vector2 start = from.vector2Value;
             Vector2 end = entry.endValue.vector2Value;
-            return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -130,7 +166,7 @@ namespace TweenAnimator
             Tween tw = _isLocal
                 ? t.DOLocalRotate(end, entry.EffectiveDuration, entry.rotateMode)
                 : t.DORotate(end, entry.EffectiveDuration, entry.rotateMode);
-            return tw.SetEase(entry.ease).SetLoops(entry.loops, entry.loopType);
+            return ApplyEase(tw, entry).SetLoops(entry.loops, entry.loopType);
         }
 
         public override Tween BuildTweenFrom(Component target, TweenEntryData entry, PropertyValueUnion from)
@@ -139,12 +175,11 @@ namespace TweenAnimator
             Vector3 start = from.vector3Value;
             Vector3 end = entry.endValue.vector3Value;
             // Explicit start: use DOTween.To for linear euler interpolation from baked start value
-            return DOTween.To(() => start, v =>
+            return ApplyEase(DOTween.To(() => start, v =>
                 {
                     if (_isLocal) t.localEulerAngles = v;
                     else t.eulerAngles = v;
-                }, end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+                }, end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -176,8 +211,7 @@ namespace TweenAnimator
         public override Tween BuildTween(Component target, TweenEntryData entry)
         {
             Color end = entry.endValue.colorValue;
-            return DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => _getter(target), v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -185,8 +219,7 @@ namespace TweenAnimator
         {
             Color start = from.colorValue;
             Color end = entry.endValue.colorValue;
-            return DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => start, v => _setter(target, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -214,8 +247,7 @@ namespace TweenAnimator
         {
             var mat = Mat(target);
             float end = entry.endValue.floatValue;
-            return DOTween.To(() => mat.GetFloat(_shaderProp), v => mat.SetFloat(_shaderProp, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => mat.GetFloat(_shaderProp), v => mat.SetFloat(_shaderProp, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -224,8 +256,7 @@ namespace TweenAnimator
             var mat = Mat(target);
             float start = from.floatValue;
             float end = entry.endValue.floatValue;
-            return DOTween.To(() => start, v => mat.SetFloat(_shaderProp, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => start, v => mat.SetFloat(_shaderProp, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -252,8 +283,7 @@ namespace TweenAnimator
         {
             var mat = Mat(target);
             Color end = entry.endValue.colorValue;
-            return DOTween.To(() => mat.GetColor(_shaderProp), v => mat.SetColor(_shaderProp, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => mat.GetColor(_shaderProp), v => mat.SetColor(_shaderProp, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 
@@ -262,8 +292,7 @@ namespace TweenAnimator
             var mat = Mat(target);
             Color start = from.colorValue;
             Color end = entry.endValue.colorValue;
-            return DOTween.To(() => start, v => mat.SetColor(_shaderProp, v), end, entry.EffectiveDuration)
-                .SetEase(entry.ease)
+            return ApplyEase(DOTween.To(() => start, v => mat.SetColor(_shaderProp, v), end, entry.EffectiveDuration), entry)
                 .SetLoops(entry.loops, entry.loopType);
         }
 

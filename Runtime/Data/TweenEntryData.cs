@@ -19,6 +19,8 @@ namespace TweenAnimator
         public float delay;
         public float speed = 1f;
         public Ease ease = Ease.Linear;
+        public bool useCustomCurve;
+        public AnimationCurve customEaseCurve = AnimationCurve.Linear(0, 0, 1, 1);
         public LoopType loopType = LoopType.Restart;
         public int loops = 1;
         public bool isEnabled = true;
