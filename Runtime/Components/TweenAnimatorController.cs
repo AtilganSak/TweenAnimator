@@ -15,11 +15,21 @@ namespace TweenAnimator
     {
     }
 
+    [Serializable]
+    public class NamedTweenClip
+    {
+        public string name = "Clip";
+        public TweenAnimatorClip clip;
+    }
+
     [DisallowMultipleComponent]
     [AddComponentMenu("TweenAnimator/Tween Animator Controller")]
     public class TweenAnimatorController : MonoBehaviour
     {
-        [SerializeField] private TweenAnimatorClip clip;
+        [SerializeField] private List<NamedTweenClip> clips = new List<NamedTweenClip>();
+        [SerializeField] private int activeClipIndex = -1;
+
+        [SerializeField] private bool playOnAwake;
 
         [Header("Events")]
         [SerializeField] private UnityEvent _onPlay = new UnityEvent();
@@ -41,9 +51,81 @@ namespace TweenAnimator
         private Dictionary<string, TweenEntryData> _entryCache;
         private Dictionary<string, EventMarkerData> _markerCache;
 
-        // ── Clip ─────────────────────────────────────────────────────────────
-        public TweenAnimatorClip Clip => clip;
-        public TweenSequenceData Sequence => clip != null ? clip.Data : null;
+        // ── Clips ────────────────────────────────────────────────────────────
+        public IReadOnlyList<NamedTweenClip> Clips => clips;
+        public int ActiveClipIndex => activeClipIndex;
+        public bool PlayOnAwake { get => playOnAwake; set => playOnAwake = value; }
+
+        /// <summary>The currently active clip (selected by index/name via Play or SetActiveClip).</summary>
+        public TweenAnimatorClip Clip => IsValidIndex(activeClipIndex) ? clips[activeClipIndex].clip : null;
+        public TweenSequenceData Sequence => Clip != null ? Clip.Data : null;
+
+        private bool IsValidIndex(int index) => index >= 0 && index < clips.Count;
+
+        /// <summary>Find a clip's index by its display name. Returns -1 if not found.</summary>
+        public int GetClipIndex(string clipName)
+        {
+            for (int i = 0; i < clips.Count; i++)
+                if (clips[i].name == clipName) return i;
+            return -1;
+        }
+
+        /// <summary>Get a clip asset by its display name. Returns null if not found.</summary>
+        public TweenAnimatorClip GetClip(string clipName)
+        {
+            int index = GetClipIndex(clipName);
+            return index >= 0 ? clips[index].clip : null;
+        }
+
+        /// <summary>Switch the active clip without playing it. Stops any running playback. Returns false if the index is out of range.</summary>
+        public bool SetActiveClip(int index)
+        {
+            if (!IsValidIndex(index))
+            {
+                Debug.LogWarning($"[TweenAnimator] Clip index {index} out of range (clips: {clips.Count}) on \"{gameObject.name}\".", this);
+                return false;
+            }
+
+            Stop();
+            activeClipIndex = index;
+            _entryCache = null;
+            _markerCache = null;
+            return true;
+        }
+
+        /// <summary>Switch the active clip by name without playing it. Returns false if not found.</summary>
+        public bool SetActiveClip(string clipName)
+        {
+            int index = GetClipIndex(clipName);
+            if (index < 0)
+            {
+                Debug.LogWarning($"[TweenAnimator] No clip named \"{clipName}\" on \"{gameObject.name}\".", this);
+                return false;
+            }
+
+            return SetActiveClip(index);
+        }
+
+        /// <summary>Add a new clip slot. If no clip is active yet, it becomes the active one.</summary>
+        public int AddClip(string clipName, TweenAnimatorClip clipAsset)
+        {
+            clips.Add(new NamedTweenClip { name = clipName, clip = clipAsset });
+            int index = clips.Count - 1;
+            if (!IsValidIndex(activeClipIndex)) SetActiveClip(index);
+            return index;
+        }
+
+        /// <summary>Remove a clip slot by index.</summary>
+        public void RemoveClipAt(int index)
+        {
+            if (!IsValidIndex(index)) return;
+            if (index == activeClipIndex) Stop();
+            clips.RemoveAt(index);
+            if (activeClipIndex == index) activeClipIndex = -1;
+            else if (activeClipIndex > index) activeClipIndex--;
+            _entryCache = null;
+            _markerCache = null;
+        }
 
         // ── State ─────────────────────────────────────────────────────────────
         /// <summary>Sequence is built and actively playing.</summary>
@@ -128,10 +210,36 @@ namespace TweenAnimator
         /// Find a marker by display name or markerId. Returns null if not found.
         /// Example: ctrl.GetMarker("OnJump").OnTrigger += HandleJump;
         /// </summary>
-        public EventMarkerData GetMarker(string nameOrId)
+        public EventMarkerData GetMarker(string name)
         {
             EnsureMarkerCache();
-            return _markerCache.TryGetValue(nameOrId, out var m) ? m : null;
+            return _markerCache.TryGetValue(name, out var m) ? m : null;
+        }
+
+        /// <summary>Find a marker on the clip at the given index, without switching the active clip.</summary>
+        public EventMarkerData GetMarker(int clipIndex, string name) =>
+            FindMarker(GetClipSequence(clipIndex), name);
+
+        /// <summary>Find a marker on the clip with the given display name, without switching the active clip.</summary>
+        public EventMarkerData GetMarker(string clipName, string name) =>
+            FindMarker(GetClipSequence(clipName), name);
+
+        private static EventMarkerData FindMarker(TweenSequenceData seq, string name)
+        {
+            if (seq?.markers == null) return null;
+            foreach (var m in seq.markers)
+                if (m.displayName == name || m.markerId == name)
+                    return m;
+            return null;
+        }
+
+        private TweenSequenceData GetClipSequence(int clipIndex) =>
+            IsValidIndex(clipIndex) ? clips[clipIndex].clip?.Data : null;
+
+        private TweenSequenceData GetClipSequence(string clipName)
+        {
+            int index = GetClipIndex(clipName);
+            return index >= 0 ? GetClipSequence(index) : null;
         }
 
         private void RebuildMarkerCache()
@@ -167,19 +275,58 @@ namespace TweenAnimator
             return marker;
         }
 
+        /// <summary>Add a marker to the clip at the given index, without switching the active clip.</summary>
+        public EventMarkerData AddMarker(int clipIndex, string displayName, float time)
+        {
+            var seq = GetClipSequence(clipIndex);
+            if (seq == null) return null;
+            if (seq.markers == null) seq.markers = new List<EventMarkerData>();
+
+            var marker = new EventMarkerData { displayName = displayName, time = time };
+            seq.markers.Add(marker);
+            if (clipIndex == activeClipIndex) _markerCache = null;
+            return marker;
+        }
+
+        /// <summary>Add a marker to the clip with the given display name, without switching the active clip.</summary>
+        public EventMarkerData AddMarker(string clipName, string displayName, float time)
+        {
+            int index = GetClipIndex(clipName);
+            return index >= 0 ? AddMarker(index, displayName, time) : null;
+        }
+
         /// <summary>
         /// Remove a marker by display name or markerId. Returns true if found and removed.
         /// </summary>
-        public bool RemoveMarker(string nameOrId)
+        public bool RemoveMarker(string name)
         {
             if (Sequence?.markers == null) return false;
 
             EnsureMarkerCache();
-            if (!_markerCache.TryGetValue(nameOrId, out var marker)) return false;
+            if (!_markerCache.TryGetValue(name, out var marker)) return false;
 
             Sequence.markers.Remove(marker);
             _markerCache = null;
             return true;
+        }
+
+        /// <summary>Remove a marker from the clip at the given index, without switching the active clip.</summary>
+        public bool RemoveMarker(int clipIndex, string name)
+        {
+            var seq = GetClipSequence(clipIndex);
+            var marker = FindMarker(seq, name);
+            if (marker == null) return false;
+
+            seq.markers.Remove(marker);
+            if (clipIndex == activeClipIndex) _markerCache = null;
+            return true;
+        }
+
+        /// <summary>Remove a marker from the clip with the given display name, without switching the active clip.</summary>
+        public bool RemoveMarker(string clipName, string name)
+        {
+            int index = GetClipIndex(clipName);
+            return index >= 0 && RemoveMarker(index, name);
         }
 
         // ── Inspector event accessors ─────────────────────────────────────────
@@ -193,7 +340,7 @@ namespace TweenAnimator
         private void Awake()
         {
             DOTween.Init(recycleAllByDefault: true, useSafeMode: true);
-            if (Sequence != null && Sequence.playOnAwake)
+            if (playOnAwake)
                 Play();
         }
 
@@ -239,11 +386,24 @@ namespace TweenAnimator
             return tcs.Task;
         }
 
-        /// <summary>Assign a new clip then play it from the beginning.</summary>
-        public void Play(TweenAnimatorClip newClip)
+        /// <summary>Switch to the clip at the given index and play it, returning a Task that completes when it finishes.</summary>
+        public Task PlayAsync(int clipIndex, CancellationToken cancellationToken = default) =>
+            SetActiveClip(clipIndex) ? PlayAsync(cancellationToken) : Task.CompletedTask;
+
+        /// <summary>Switch to the clip with the given display name and play it, returning a Task that completes when it finishes.</summary>
+        public Task PlayAsync(string clipName, CancellationToken cancellationToken = default) =>
+            SetActiveClip(clipName) ? PlayAsync(cancellationToken) : Task.CompletedTask;
+
+        /// <summary>Switch to the clip at the given index and play it from the beginning.</summary>
+        public void Play(int clipIndex)
         {
-            SetClip(newClip);
-            Play();
+            if (SetActiveClip(clipIndex)) Play();
+        }
+
+        /// <summary>Switch to the clip with the given display name and play it from the beginning.</summary>
+        public void Play(string clipName)
+        {
+            if (SetActiveClip(clipName)) Play();
         }
 
         /// <summary>Play from a specific time in seconds.</summary>
@@ -251,6 +411,18 @@ namespace TweenAnimator
         {
             Play();
             _builtSequence?.Goto(Mathf.Clamp(time, 0f, Duration), andPlay: true);
+        }
+
+        /// <summary>Switch to the clip at the given index and play it from a specific time in seconds.</summary>
+        public void PlayFromTime(int clipIndex, float time)
+        {
+            if (SetActiveClip(clipIndex)) PlayFromTime(time);
+        }
+
+        /// <summary>Switch to the clip with the given display name and play it from a specific time in seconds.</summary>
+        public void PlayFromTime(string clipName, float time)
+        {
+            if (SetActiveClip(clipName)) PlayFromTime(time);
         }
 
         /// <summary>Play from a normalized position (0 = start, 1 = end).</summary>
@@ -269,6 +441,18 @@ namespace TweenAnimator
             FirePlay();
         }
 
+        /// <summary>Switch to the clip at the given index and play it backwards from the end.</summary>
+        public void PlayBackward(int clipIndex)
+        {
+            if (SetActiveClip(clipIndex)) PlayBackward();
+        }
+
+        /// <summary>Switch to the clip with the given display name and play it backwards from the end.</summary>
+        public void PlayBackward(string clipName)
+        {
+            if (SetActiveClip(clipName)) PlayBackward();
+        }
+
         /// <summary>Play backwards from a specific time in seconds.</summary>
         public void PlayBackwardFromTime(float time)
         {
@@ -279,6 +463,18 @@ namespace TweenAnimator
             _builtSequence.Goto(Mathf.Clamp(time, 0f, Duration), andPlay: false);
             _builtSequence.PlayBackwards();
             FirePlay();
+        }
+
+        /// <summary>Switch to the clip at the given index and play it backwards from a specific time in seconds.</summary>
+        public void PlayBackwardFromTime(int clipIndex, float time)
+        {
+            if (SetActiveClip(clipIndex)) PlayBackwardFromTime(time);
+        }
+
+        /// <summary>Switch to the clip with the given display name and play it backwards from a specific time in seconds.</summary>
+        public void PlayBackwardFromTime(string clipName, float time)
+        {
+            if (SetActiveClip(clipName)) PlayBackwardFromTime(time);
         }
 
         /// <summary>Play backwards from a normalized position (0 = start, 1 = end).</summary>
@@ -328,15 +524,6 @@ namespace TweenAnimator
         /// <summary>Seek to a normalized position (0–1) without changing play/pause state.</summary>
         public void GotoNormalizedTime(float normalizedTime) =>
             GotoTime(normalizedTime * Duration);
-
-        /// <summary>Replace the clip. Stops any running playback.</summary>
-        public void SetClip(TweenAnimatorClip newClip)
-        {
-            Stop();
-            clip = newClip;
-            _entryCache = null;
-            _markerCache = null;
-        }
 
         // ── Internal helpers ─────────────────────────────────────────────────
 
@@ -390,7 +577,7 @@ namespace TweenAnimator
             var newClip = ScriptableObject.CreateInstance<TweenAnimatorClip>();
             UnityEditor.AssetDatabase.CreateAsset(newClip, path);
             UnityEditor.AssetDatabase.SaveAssets();
-            clip = newClip;
+            AddClip(newClip.name, newClip);
             UnityEditor.EditorUtility.SetDirty(this);
         }
 #endif

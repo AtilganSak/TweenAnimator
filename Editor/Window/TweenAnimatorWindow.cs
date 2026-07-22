@@ -272,8 +272,28 @@ namespace TweenAnimator.Editor
             GUILayout.FlexibleSpace();
             GUILayout.BeginVertical(GUILayout.Width(320));
 
-            GUILayout.Label($"\"{ctrl.gameObject.name}\" has no Tween Clip assigned.", EditorStyles.wordWrappedLabel);
+            GUILayout.Label($"\"{ctrl.gameObject.name}\" has no active Tween Clip.", EditorStyles.wordWrappedLabel);
             GUILayout.Space(8);
+
+            if (ctrl.Clips.Count > 0)
+            {
+                GUILayout.Label("Pick a clip:");
+                string[] existingNames = new string[ctrl.Clips.Count];
+                for (int i = 0; i < existingNames.Length; i++)
+                    existingNames[i] = string.IsNullOrEmpty(ctrl.Clips[i].name) ? $"Clip {i}" : ctrl.Clips[i].name;
+
+                int picked = EditorGUILayout.Popup(-1, existingNames);
+                if (picked >= 0)
+                {
+                    Undo.RecordObject(ctrl, "Set Active Clip");
+                    ctrl.SetActiveClip(picked);
+                    EditorUtility.SetDirty(ctrl);
+                    _state.Evaluate();
+                    Repaint();
+                }
+
+                GUILayout.Space(8);
+            }
 
             GUILayout.BeginHorizontal();
             GUILayout.Label("Assign Clip:", GUILayout.Width(80));
@@ -281,7 +301,7 @@ namespace TweenAnimator.Editor
             if (assigned != null)
             {
                 Undo.RecordObject(ctrl, "Assign Tween Clip");
-                ctrl.SetClip(assigned);
+                ctrl.AddClip(assigned.name, assigned);
                 EditorUtility.SetDirty(ctrl);
                 _state.Evaluate();
                 Repaint();
@@ -297,7 +317,7 @@ namespace TweenAnimator.Editor
                 if (newClip != null)
                 {
                     Undo.RecordObject(ctrl, "Assign Tween Clip");
-                    ctrl.SetClip(newClip);
+                    ctrl.AddClip(newClip.name, newClip);
                     EditorUtility.SetDirty(ctrl);
                     _state.Evaluate();
                     Repaint();
@@ -343,16 +363,26 @@ namespace TweenAnimator.Editor
                 SceneView.lastActiveSceneView.FrameSelected();
             }
 
-            var newClip = (TweenAnimatorClip)EditorGUILayout.ObjectField(
-                ctrl.Clip, typeof(TweenAnimatorClip), false, GUILayout.Width(130));
-            if (newClip != ctrl.Clip)
+            var clipList = ctrl.Clips;
+            string[] clipNames = new string[clipList.Count];
+            for (int i = 0; i < clipNames.Length; i++)
+                clipNames[i] = string.IsNullOrEmpty(clipList[i].name) ? $"Clip {i}" : clipList[i].name;
+
+            EditorGUI.BeginDisabledGroup(clipNames.Length == 0);
+            int shownIndex = clipNames.Length == 0 ? 0 : Mathf.Max(0, ctrl.ActiveClipIndex);
+            int pickedIndex = EditorGUILayout.Popup(shownIndex,
+                clipNames.Length == 0 ? new[] { "(no clips)" } : clipNames,
+                EditorStyles.toolbarPopup, GUILayout.Width(130));
+            if (clipNames.Length > 0 && pickedIndex != ctrl.ActiveClipIndex)
             {
-                Undo.RecordObject(ctrl, "Assign Tween Clip");
-                ctrl.SetClip(newClip);
+                Undo.RecordObject(ctrl, "Set Active Clip");
+                ctrl.SetActiveClip(pickedIndex);
                 EditorUtility.SetDirty(ctrl);
                 _state.Evaluate();
                 Repaint();
             }
+
+            EditorGUI.EndDisabledGroup();
 
             if (GUILayout.Button("New Clip", EditorStyles.toolbarButton, GUILayout.Width(58)))
             {
@@ -360,7 +390,7 @@ namespace TweenAnimator.Editor
                 if (created != null)
                 {
                     Undo.RecordObject(ctrl, "Assign Tween Clip");
-                    ctrl.SetClip(created);
+                    ctrl.AddClip(created.name, created);
                     EditorUtility.SetDirty(ctrl);
                     _state.Evaluate();
                     Repaint();

@@ -9,7 +9,6 @@ namespace TweenAnimator
     {
         public string displayName = "Sequence";
         public float timeScale = 1f;
-        public bool playOnAwake;
         public bool autoKillOnComplete = true;
         public List<TweenEntryData> entries = new List<TweenEntryData>();
         public List<EventMarkerData> markers = new List<EventMarkerData>();

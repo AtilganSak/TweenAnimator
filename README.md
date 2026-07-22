@@ -79,7 +79,13 @@ Each track shows one animation entry as a colored block on the timeline.
 
 Click **▶ Preview** (or press the play button in the editor window) to enter preview mode. Drag the red playhead to scrub through the animation in Edit Mode — no need to enter Play Mode.
 
-### 6. Play at Runtime
+### 6. Manage Clips (Inspector)
+
+The `TweenAnimatorController` Inspector shows a **Clips** list — each row is a name + `TweenAnimatorClip` asset. Use **+ Add Clip Slot** to add more, **×** to remove, and **Set Active** to pick which one is the *active clip* (its row turns green). The active clip is what the Tween Animator window edits/previews, and what `Play()` plays by default.
+
+Enable **Play On Awake** to auto-play whichever clip is Active as soon as the scene starts.
+
+### 7. Play at Runtime
 
 ```csharp
 using TweenAnimator;
@@ -195,9 +201,8 @@ AnimationClip anim = TweenClipToAnimationClipConverter.ConvertToAnimationClip(tw
 ```csharp
 TweenAnimatorController ctrl = GetComponent<TweenAnimatorController>();
 
-// Playback
+// Playback (always plays the active clip)
 ctrl.Play();
-ctrl.Play(otherClip);           // swap clip then play
 ctrl.PlayFromTime(0.5f);
 ctrl.PlayFromNormalizedTime(0.5f);
 ctrl.PlayBackward();
@@ -218,9 +223,26 @@ float elapsed  = ctrl.CurrentTime;
 float duration = ctrl.Duration;
 float norm     = ctrl.NormalizedTime;
 ctrl.TimeScale = 2f;            // double speed
+```
 
-// Clip
-ctrl.SetClip(newClip);
+### Multiple Clips
+
+A controller can hold a list of named clips (see [Manage Clips](#6-manage-clips-inspector)). There is no API to hand it a raw `TweenAnimatorClip` at runtime — playback always goes through this list, by index or by name. Every playback method has index/name overloads that switch the active clip first, then play:
+
+```csharp
+ctrl.Play(0);                       // play clip at index 0
+ctrl.Play("Intro");                 // play clip named "Intro"
+ctrl.PlayBackward("Intro");
+ctrl.PlayFromTime("Intro", 0.5f);
+ctrl.PlayBackwardFromTime(0, 0.5f);
+await ctrl.PlayAsync("Intro");
+
+ctrl.SetActiveClip(1);              // switch active clip without playing
+ctrl.SetActiveClip("Outro");
+
+int index = ctrl.GetClipIndex("Intro");
+TweenAnimatorClip clip = ctrl.GetClip("Intro");
+IReadOnlyList<NamedTweenClip> clips = ctrl.Clips;
 ```
 
 ### Per-Entry Events
@@ -249,6 +271,11 @@ ctrl.Play();
 
 // Remove a marker by name or markerId
 ctrl.RemoveMarker("OnBoom");
+
+// Target a specific clip by index/name without switching the active clip
+ctrl.GetMarker("Intro", "OnJump");
+ctrl.AddMarker(1, "OnBoom", 1.5f);
+ctrl.RemoveMarker("Outro", "OnBoom");
 ```
 
 > Markers added or removed at runtime take effect on the next `Play()` call.
