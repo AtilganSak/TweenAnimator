@@ -4,6 +4,8 @@
   "displayName": "Tween Animator",
   "description": "Visual timeline-based tween animation editor for Unity, powered by DOTween. Design multi-property animations with a custom editor window, scrub-preview in Edit Mode, and play them back at runtime with a single API call.",
   "unity": "2021.3",
+  "license": "FSL-1.1-MIT",
+  "licensesUrl": "https://github.com/AtilganSak/TweenAnimator/blob/main/LICENSE.md",
   "author": {
     "name": "Atilgan Sak",
     "email": "sak.atilgan@gmail.com",

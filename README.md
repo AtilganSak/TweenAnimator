@@ -315,3 +315,9 @@ RegisterVector3<MyComponent>("myVector", "My Vector",
 The property picker and timeline editor pick up the new entry automatically.
 
 ---
+
+## License
+
+Licensed under the [Functional Source License, Version 1.1, MIT Future License](LICENSE.md) (FSL-1.1-MIT) — https://fsl.software/
+
+Free to use, modify and redistribute for any purpose except offering a competing product or service. Each version converts to the MIT license two years after its release.
